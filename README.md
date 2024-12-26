@@ -37,7 +37,7 @@ AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted
 - Python 3.9 or later.
 - Internet connection for IRC and RSS feed integration.
 - LMStudio or equivalent local/remote language model API. Bot is configured to use LMStudio at `http://localhost:1234/v1/chat/completions`.
-- Code is has comments to the lines you can customize, like RSS feed address and API connection.
+- Code is has comments to the lines you can customize, like defaults (nick, server, port), RSS feed address and API connection.
 
 ### Python Libraries
 Ensure the following libraries are installed:
