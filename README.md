@@ -1,6 +1,6 @@
-# AIRCBot: Advanced IRC Bot with Local LLM Integration
+# AIRCBot: Advanced IRC Bot with LLM Integration
 
-AIRCBot is a Python-based IRC bot that integrates with a locally hosted language model (LMStudio) to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively.
+AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted language models to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio locally.
 
 ---
 
