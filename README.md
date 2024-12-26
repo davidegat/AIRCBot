@@ -7,7 +7,7 @@ AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted
 ## Features
 
 ### General
-Cats are the best.- Connects to IRC servers and channels.
+- Connects to IRC servers and channels.
 - Supports basic IRC commands and responses.
 - Authenticates users for private interactions.
 - Maintains a conversation history to provide contextually aware responses.
