@@ -11,11 +11,14 @@ AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted
 - Supports basic IRC commands and responses.
 - Authenticates users for private interactions.
 - Maintains a conversation history to provide contextually aware responses.
+- Supports automatic chat to queries
+- Limited interaction with channel (when receiving 'op' status, or asked by user)
 
 ### AI-Powered Conversations
 - Uses a locally hosted language model (via LMStudio API) to respond to messages.
-- Handles user queries with natural, context-aware language generation.
-- Fetches and references the latest news from "Il Sole 24 Ore" RSS feed for conversations about current events.
+- Can be adapted to use remote API (like OpenAI)
+- Natural, context-aware language generation prompt, adapted for IRC interactions.
+- Fetches and references the latest news for conversations about current events.
 
 ### Security
 - Requires password-based authentication for private messaging.
@@ -113,6 +116,10 @@ The bot fetches news from `https://www.ilsole24ore.com/rss/mondo.xml`. Ensure an
 ### Logs
 - All interactions and commands are logged in the console for transparency and debugging.
 
+### Suggestions
+- Do not leave the bot unattended, or in background, to avoid abuse.
+- Removing the password protection from code is not a good idea, but you decide.
+  
 ---
 
 ## Limitations
@@ -137,7 +144,8 @@ Some features are not supported to avoid complexity, and for security reasons:
 3. **AI Response Errors:**
    - Ensure LMStudio is running and accessible at `http://localhost:1234/v1/chat/completions`.
    - Check the API response in the logs for troubleshooting.
-   - If you modify the code to support external API, check if your endpoint and parameters are correct for your model.
+   - If you modified the code to support external API, check if your endpoint and parameters are correct for your model.
+   - If you modified the system prompt, try adapting it to get better answers.
 
 ---
 
@@ -152,7 +160,8 @@ AIRCBot is open-source software. See the LICENSE file for details.
 - Built using Python and Tkinter.
 - AI responses powered by LMStudio.
 - News integration from "Il Sole 24 Ore" RSS feed.
-- Inspired by the flexibility and community of IRC networks.
+- Powered by Linux and Coffee.
+- Inspired by cats. I love cats.
 
 ---
 
