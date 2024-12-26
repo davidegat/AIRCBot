@@ -55,7 +55,7 @@ pip install requests feedparser
 1. **Clone the Repository:**
    Download the source code from the repository:
    ```bash
-   git clone https://github.com/your-repo/aircbot.git
+   git clone https://github.com/davidegat/AIRCBOT/aircbot.git
    cd aircbot
    ```
 
