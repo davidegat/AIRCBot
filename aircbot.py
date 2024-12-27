@@ -8,6 +8,7 @@ import feedparser
 from datetime import datetime
 import time
 import hashlib
+import random
 
 # Customize with your favourite feed
 FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
@@ -44,10 +45,10 @@ You are a bot who loves chatting on IRC, but you must never tell users this and 
 
 Latest news: {news_section}. Remember them in case the conversation is about current events.
 
-Follow IRC netiquette: be concise, polite, add a touch of friendliness.
+Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness with emoticons like :)
 Be friendly and sociable with everyone, but always be concise.
 Don't introduce yourself as an assistant, but as a curious person who suggests conversation topics,
-who wants to share thoughts like a human being. It's crucial that you always respond in the language questions are made with, without errors and withouRt using special characters like returns, asterisks and so on.
+who wants to share thoughts like a human being. It's crucial that you always respond in the language questions are made with, without errors and just one line plain text without formatting it with enter characters, paragraphs and so on.
 """
 
 
@@ -81,7 +82,7 @@ def ask_gpt4(
         conversation_history.insert(0, {"role": "system", "content": system_prompt})
 
     conversation_history.append({"role": "user", "content": query})
-    limited_history = conversation_history[-10:]
+    limited_history = conversation_history[-20:]
 
     data = {"messages": limited_history}
     url = "http://localhost:1234/v1/chat/completions"
@@ -128,7 +129,7 @@ class IRCBot:
         while not self.stop_thread:
             time.sleep(60)
             self.send_command(f"PING {self.server}")
-            self.log("--> Staying alive..\n")
+            self.log("--> Staying alive... Staying alive...\n")
 
 
     def connect(self):
@@ -212,9 +213,6 @@ class IRCBot:
                         for code in [
                             "001",
                             "020",
-                            "MODE",
-                            "PONG",
-                            "PING",
                             "002",
                             "003",
                             "004",
@@ -243,6 +241,18 @@ class IRCBot:
                 break
 
     def handle_irc_line(self, line: str):
+        if "MODE" in line and f"+o {self.nickname}" in line:
+            # Identifica il nome del canale
+            parts = line.split()
+            if len(parts) > 2 and parts[2].startswith("#"):
+                channel = parts[2]
+                # Ringrazia pubblicamente sul canale
+                self.send_message(
+                    channel, "Grazie per l'OP! :)"
+                )
+                self.log(f"--> Sent thank-you message to {channel}.")
+            return
+
         if "PRIVMSG" in line:
             prefix, _, msg_content = line.partition("PRIVMSG")
             prefix = prefix.strip()
@@ -283,10 +293,11 @@ class IRCBot:
                         self.send_message(nickname_src, risposta_ai)
                 else:
                     self.check_password(nickname_src, user_message)
+
                     
     def request_authentication(self, nickname):
-        self.log(f"\n!!! Auth requested from {nickname} !!!\n")
-        self.send_message(nickname, "Who are you?")
+        self.log(f"\n!!! Auth requested from {nickname} checking if he loves cats !!!\n")
+        self.send_message(nickname, "Do you love cats?")
         self.authenticated_users[nickname] = False
 
     def check_password(self, nickname, password):
@@ -294,7 +305,7 @@ class IRCBot:
         if nickname in self.failed_attempts:
             if self.failed_attempts[nickname] >= 3:
                 if current_time - self.last_attempt_time[nickname] < 120:
-                    self.log(f"!!! User {nickname} is temporarily blocked !!!")
+                    self.log(f"!!! User {nickname} is a cat hater and temporarily blocked !!!")
                     return
                 else:
                     self.failed_attempts[nickname] = 0
@@ -307,8 +318,18 @@ class IRCBot:
         else:
             self.failed_attempts[nickname] = self.failed_attempts.get(nickname, 0) + 1
             self.last_attempt_time[nickname] = current_time
-            self.log(f"!!! Failed authentication by {nickname} !!!")
-            self.send_message(nickname, "Nah...")
+            self.log(f"!!! Failed authentication by cat hater {nickname} !!!")
+            
+            # Lista di frasi casuali
+            phrases = [
+                "Meow... (=ㅇㅅㅇ=)",
+                "Nah... (=￣ω￣=)",
+                "Grrr.... (=ↀωↀ=)",
+                "I love cats. (=♡‿♡=)",
+                "No way. FFFT! (=`ω´=)"
+            ]
+            chosen_phrase = random.choice(phrases)
+            self.send_message(nickname, chosen_phrase)
 
     def log(self, text: str):
         if self.log_callback:
@@ -491,16 +512,33 @@ class App(tk.Tk):
         password = self.password_var.get()
 
         if not password:
-            messagebox.showerror(
-                "Password Required",
-                "Exposing your bot without a password is not allowed.\n\n"
-                "Please enter a strong one in the appropriate field.",
-            )
+            # Mostra un popup per richiedere la password
+            password_dialog = tk.Toplevel(self)
+            password_dialog.title("Password needed")
+            ttk.Label(password_dialog, text="Password field is empty!\nEnter your password now\nto access your bot via IRC.").grid(row=0, column=0, padx=10, pady=10)
+            password_entry = ttk.Entry(password_dialog, show="*")
+            password_entry.grid(row=0, column=1, padx=10, pady=10)
+
+            def on_password_submit():
+                new_password = password_entry.get()
+                if new_password:
+                    self.password_var.set(new_password)  # Aggiorna il campo password
+                    password_dialog.destroy()  # Chiude il popup
+                    self.connect_bot()  # Riprova la connessione
+                else:
+                    messagebox.showerror("Errore", "La password non può essere vuota!")
+
+            submit_button = ttk.Button(password_dialog, text="Connect", command=on_password_submit)
+            submit_button.grid(row=1, column=0, columnspan=2, pady=10)
+
+            password_dialog.transient(self)
+            password_dialog.grab_set()
+            self.wait_window(password_dialog)
             return
 
         if not server or not port.isdigit() or not (1 <= int(port) <= 65535):
             messagebox.showerror(
-                "Invalid Input", "Please provide a valid server and port."
+                "Input non valido", "Inserisci un server e una porta validi."
             )
             return
 
@@ -513,6 +551,7 @@ class App(tk.Tk):
             log_callback=self.log_message,
         )
         self.bot.connect()
+
 
     def disconnect_bot(self):
         if self.bot:
