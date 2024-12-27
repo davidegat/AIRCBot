@@ -109,8 +109,8 @@ class IRCBot:
         self.last_attempt_time = {}
 
     def connect(self):
+        self.log(f"Attempting connection to {self.server}:{self.port}...")
         try:
-            self.log(f"Attempting connection to {self.server}:{self.port}...")
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.settimeout(60)
             self.socket.connect((self.server, self.port))
@@ -171,13 +171,17 @@ class IRCBot:
                 lines = buffer.split("\r\n")
                 buffer = lines.pop()
                 for line in lines:
-                    self.log(f"SERVER: {line}")
+                    # Ignora i messaggi relativi al MOTD
+                    if any(code in line for code in ["002", "003", "004", "005", "042", "252", "253", "254", "255", "256", "265", "375", "372", "376", "001"]):
+                        continue
+                    self.log(f"{line}")
                     if "ERROR" in line:
                         self.log("Command rejected by server: " + line)
                     self.handle_irc_line(line)
             except Exception as e:
                 self.log(f"Error listening to server: {e}")
                 break
+
 
     def handle_irc_line(self, line: str):
         if "PRIVMSG" in line:
@@ -332,7 +336,6 @@ class App(tk.Tk):
         self.config(menu=menu_bar)
 
     def show_help(self):
-        self.log("Opening help window...")
         help_window = tk.Toplevel(self)
         help_window.title("Help")
         help_window.geometry("600x400")
