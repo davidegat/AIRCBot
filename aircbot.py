@@ -14,10 +14,11 @@ FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
 
 # Default options at startup (user can modify them via UI)
 nck = "Egidio"  # Nick
-srv = "open.ircnet.net"  # Server
+srv = "openirc.snt.utwente.nl"  # Server
 prt = "6667"  # Port
 chn = "#casale"  # Channel
 usr = "aipwrd"
+
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -39,12 +40,12 @@ You are a bot who loves chatting on IRC, but you must never tell users this and 
 - Channel: {channel}
 - The user talking to you is: {speaker_nickname}
 - Date and time: {current_datetime}
-- Personal preferences: it is crucial to remember you love cats like crazy
+- Personal preferences: you love cats
 
 Latest news: {news_section}. Remember them in case the conversation is about current events.
 
-Follow IRC netiquette: be concise, polite, add a touch of friendliness without overdoing it.
-Be friendly and sociable with everyone.
+Follow IRC netiquette: be concise, polite, add a touch of friendliness.
+Be friendly and sociable with everyone, but always be concise.
 Don't introduce yourself as an assistant, but as a curious person who suggests conversation topics,
 who wants to share thoughts like a human being. It's crucial that you always respond in the language questions are made with, without errors and withouRt using special characters like returns, asterisks and so on.
 """
@@ -123,22 +124,37 @@ class IRCBot:
         self.failed_attempts = {}
         self.last_attempt_time = {}
 
+    def keep_alive(self):
+        while not self.stop_thread:
+            time.sleep(60)
+            self.send_command(f"PING {self.server}")
+            self.log("--> Staying alive..\n")
+
+
     def connect(self):
         self.log(f"--> Attempting connection to {self.server}:{self.port}...")
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.settimeout(60)
             self.socket.connect((self.server, self.port))
-            self.log(f"--> Successfully connected to {self.server}:{self.port}.")
+            self.log(f"--> Successfully connected to {self.server}:{self.port}!\n")
             self.send_command(f"NICK {self.nickname}")
             self.send_command(f"USER {usr} 0 * :{self.nickname}")
+            self.log(f"\n--> {self.server} is checking our connection, be patient...\n")
+
             self.stop_thread = False
             self.listen_thread = threading.Thread(
                 target=self.listen_to_server, daemon=True
             )
             self.listen_thread.start()
+
+            # Avvia il thread del "keep-alive"
+            self.keep_alive_thread = threading.Thread(
+                target=self.keep_alive, daemon=True
+            )
+            self.keep_alive_thread.start()
         except socket.timeout:
-            self.log("!!! Connection timeout. Retrying !!!")
+            self.log("\n!!! Connection timeout. Retrying !!!\n")
             self.disconnect()
             self.connect()
         except Exception as e:
@@ -150,7 +166,7 @@ class IRCBot:
         if self.socket:
             try:
                 self.socket.close()
-                self.log("--> Successfully disconnected.")
+                self.log("--> Disconnected.")
             except Exception as e:
                 self.log(f"!!! Error disconnecting: {e} !!!")
         self.socket = None
@@ -182,14 +198,23 @@ class IRCBot:
                 buffer += data
                 if "PING" in data:
                     pong_token = data.split()[1]
-                    self.log("--> Gotto PINGU? Sendo PONGU!")
                     self.send_command(f"PONG {pong_token}")
+                    self.log("--> Connection verified!\n")
+
+
+                    self.log(f"--> {nck} is now ready to chat!\n")
+
                 lines = buffer.split("\r\n")
                 buffer = lines.pop()
                 for line in lines:
                     if any(
                         code in line
                         for code in [
+                            "001",
+                            "020",
+                            "MODE",
+                            "PONG",
+                            "PING",
                             "002",
                             "003",
                             "004",
@@ -206,7 +231,6 @@ class IRCBot:
                             "376",
                             "251",
                             "266",
-
                         ]
                     ):
                         continue
@@ -241,7 +265,9 @@ class IRCBot:
                     self.request_authentication(nickname_src)
                 elif self.authenticated_users[nickname_src]:
                     try:
-                        self.log(f"\n--> Generating AI response for {nickname_src}...\n")
+                        self.log(
+                            f"\n--> Generating AI response for {nickname_src}...\n"
+                        )
                         risposta_ai, role = ask_gpt4(
                             query=user_message,
                             conversation_history=self.conversation_history,
@@ -257,9 +283,9 @@ class IRCBot:
                         self.send_message(nickname_src, risposta_ai)
                 else:
                     self.check_password(nickname_src, user_message)
-
+                    
     def request_authentication(self, nickname):
-        self.log(f"!!! Auth requested from {nickname} !!!")
+        self.log(f"\n!!! Auth requested from {nickname} !!!\n")
         self.send_message(nickname, "Who are you?")
         self.authenticated_users[nickname] = False
 
@@ -276,7 +302,7 @@ class IRCBot:
         if hash_password(password) == self.password_hash:
             self.authenticated_users[nickname] = True
             self.failed_attempts[nickname] = 0
-            self.log(f"!!! User {nickname} authenticated !!!")
+            self.log(f"\n!!! User {nickname} authenticated !!!\n")
             self.send_message(nickname, "Ok, say something...")
         else:
             self.failed_attempts[nickname] = self.failed_attempts.get(nickname, 0) + 1
@@ -508,7 +534,9 @@ class App(tk.Tk):
         if self.bot:
             cmd = self.command_var.get().strip()
             if cmd.lower().startswith("/join"):
-                self.log_message("!!! /join command is disabled and cannot be executed !!!")
+                self.log_message(
+                    "!!! /join command is disabled and cannot be executed !!!"
+                )
                 messagebox.showerror("Command Blocked", "/join command not allowed.")
                 self.command_var.set("")
                 return
