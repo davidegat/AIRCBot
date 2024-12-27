@@ -84,9 +84,6 @@ In the GUI, fill in the following fields:
 - **Nickname:** bot's IRC nickname (e.g., `Egidio`).
 - **Channel:** IRC channel to join (e.g., `#example`).
 - **Password:** Password required for private messaging authentication. Connection will not be possible if no password is set.
-- 
-### News Feed Integration
-The bot fetches news from `https://www.ilsole24ore.com/rss/mondo.xml`. Ensure an active internet connection for this feature. 
 
 ---
 
@@ -163,7 +160,6 @@ AIRCBot is open-source software. See the LICENSE file for details.
 
 - Built using Python and Tkinter.
 - AI responses powered by LMStudio.
-- News integration from "Il Sole 24 Ore" RSS feed.
 - Powered by Linux and Coffee.
 - Inspired by cats. I love cats.
 
