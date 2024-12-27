@@ -23,7 +23,7 @@ AIRCBot is a Python-based IRC bot that interacts with a local language models to
 
 ### Security
 - Requires password-based authentication for private messaging.
-- Implements anti-brute-force measures with temporary blocking for multiple failed login attempts.
+- Implements basic anti-brute-force measures with temporary blocking for multiple failed login attempts.
 - Uses a local LLM by default to increase privacy. 
 - No secure connection support by now. 
 
@@ -50,10 +50,13 @@ Ensure the following libraries are installed:
 - `tkinter`
 - `requests`
 - `feedparser`
-- `socket`
 - `threading`
+- `time`
+- `hashlib`
+- `irc` (irc.client)
+  
 
-Install missing dependencies using:
+Install missing dependencies using (example):
 ```bash
 pip install requests feedparser
 ```
