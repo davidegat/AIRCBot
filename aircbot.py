@@ -9,15 +9,15 @@ import time
 import hashlib
 import irc.client
 
-# Customize with your favourite feed
+# Customize
 FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
+usr = "aipwrd"  # User (for ident)
 
 # Default options at startup (user can modify them via UI)
 nck = "Egidio"  # Nick
 srv = "openirc.snt.utwente.nl"  # Server
 prt = "6667"  # Port
 chn = "#casale"  # Channel
-usr = "aipwrd" # User (for ident)
 
 
 def hash_password(password):
@@ -45,11 +45,13 @@ class IRCBot:
         self.last_attempt_time = {}
         self.client = irc.client.Reactor()
         self.connection = None
-        self.keep_alive_interval = 60           
+        self.keep_alive_interval = 60
         self.logged_messages = set()
         self.exclude_keywords = [
             "end of names list",
+            "+i",
             "privmsg",
+            "pong",
             "001",
             "002",
             "003",
@@ -68,12 +70,16 @@ class IRCBot:
             "353",
             "366",
             "372",
+            "375",
         ]
         self.conversation_history = []
 
     def connect(self):
         if self.log_callback:
-            self.log_callback(f"--> Attempting connection to {self.server}:{self.port}...")
+            self.log_callback(
+                f"BOT - Connecting to IRC... ({self.server} on port {self.port})",
+                bold=True,
+            )
         try:
             self.connection = self.client.server().connect(
                 self.server, int(self.port), self.nickname
@@ -82,20 +88,20 @@ class IRCBot:
             self.start_keep_alive()
             threading.Thread(target=self.client.process_forever, daemon=True).start()
             if self.log_callback:
-                self.log_callback(f"--> Server {self.server} is up!\n")
+                self.log_callback(f"BOT - Server {self.server} is up!\n", bold=True)
         except Exception as e:
             if self.log_callback:
-                self.log_callback(f"\n!!! Error while connecting: {e} !!!\n")
+                self.log_callback(f"\nBOT - Error while connecting: {e}\n", bold=True)
 
     def join_channel(self):
         if self.connection:
             try:
                 self.connection.join(self.channel)
-                if self.log_callback:
-                    self.log_callback(f"\n--> Joined channel {self.channel}\n")
             except Exception as e:
                 if self.log_callback:
-                    self.log_callback(f"\n!!! Error joining channel: {e} !!!\n")
+                    self.log_callback(
+                        f"\nBOT - Error joining {self.channel}: {e}\n", bold=True
+                    )
 
     def start_keep_alive(self):
         if self.connection:
@@ -106,16 +112,16 @@ class IRCBot:
 
     def disconnect(self):
         if self.log_callback:
-            self.log_callback("\n--> Disconnecting...\n")
+            self.log_callback("\nBOT - Disconnecting...\n", bold=True)
         if self.connection:
             try:
                 self.connection.disconnect("Goodbye!")
                 if self.log_callback:
-                    self.log_callback("--> Disconnected.\n")
+                    self.log_callback("BOT - Disconnected.\n", bold=True)
             except Exception as e:
                 if self.log_callback:
-                    self.log_callback(f"!!! Error disconnecting: {e} !!!")
-                    
+                    self.log_callback(f"BOT - Error disconnecting: {e}", bold=True)
+
     def handle_server_message(self, connection, event):
         if event.type == "privmsg":
             self.on_private_message(connection, event)
@@ -126,26 +132,25 @@ class IRCBot:
 
     def handle_mode_event(self, connection, event):
         if len(event.arguments) >= 2:
-            mode_change = event.arguments[0]               
-            target = event.arguments[1]               
-            source = irc.client.NickMask(event.source).nick   
-            if mode_change == "+o" and target == self.nickname:                   
-                self.log_callback(f"--> {source} has opped {self.nickname}")
-                self.send_message(self.channel, f"Thanks for op, {source}! :*")
+            mode_change = event.arguments[0]
+            target = event.arguments[1]
+            source = irc.client.NickMask(event.source).nick
+            if mode_change == "+o" and target == self.nickname:
+                self.send_message(self.channel, f"Thanks for @ {source}! :*")
 
     def on_private_message(self, connection, event):
         source = event.source.nick
         message = event.arguments[0]
 
-
         if self.log_callback:
-            self.log_callback(f"\n({source}) - {message}", bold=True)
-
+            self.log_callback(f"IRC - From {source}: {message}", bold=True)
 
         if source not in self.authenticated_users:
             self.request_authentication(source)
         elif self.authenticated_users[source]:
-            self.log_callback(f"--> Generating AI response for {source}...")
+            self.log_callback(
+                f"BOT - Generating AI response for {source}...", bold=True
+            )
             response, role = ask_gpt4(
                 query=message,
                 conversation_history=self.conversation_history,
@@ -157,7 +162,6 @@ class IRCBot:
             self.send_message(source, response)
         else:
             self.check_password(source, message)
-
 
     def log_raw_messages(self, connection, event):
         raw_message = " ".join(event.arguments).strip() if event.arguments else ""
@@ -175,11 +179,13 @@ class IRCBot:
 
         self.logged_messages.add(message_signature)
         if self.log_callback:
-            self.log_callback(f"[SERVER]: {normalized_message}")
+            self.log_callback(f"IRC - {normalized_message}")
 
     def request_authentication(self, nickname):
         if self.log_callback:
-            self.log_callback(f"User {nickname} must be authenticated...")
+            self.log_callback(
+                f"IRC - User {nickname} must be authenticated...", bold=True
+            )
         self.send_message(nickname, "Do you love cats?")
         self.authenticated_users[nickname] = False
 
@@ -189,7 +195,9 @@ class IRCBot:
             if self.failed_attempts[nickname] >= 3:
                 if current_time - self.last_attempt_time[nickname] < 120:
                     if self.log_callback:
-                        self.log_callback(f"User {nickname} temporarily blocked")
+                        self.log_callback(
+                            f"BOT - User {nickname} temporarily blocked", bold=True
+                        )
                     return
                 else:
                     self.failed_attempts[nickname] = 0
@@ -197,14 +205,16 @@ class IRCBot:
         if hash_password(password) == self.password_hash:
             self.authenticated_users[nickname] = True
             if self.log_callback:
-                self.log_callback(f"User {nickname} authenticated")
-            self.send_message(nickname, "Ok, say something...")
+                self.log_callback(f"BOT - User {nickname} authenticated", bold=True)
+            self.send_message(nickname, "Ok, let's talk about cats! (=^_^=) ❤")
         else:
             self.failed_attempts[nickname] = self.failed_attempts.get(nickname, 0) + 1
             self.last_attempt_time[nickname] = current_time
             if self.log_callback:
-                self.log_callback(f"Failed authentication by {nickname}")
-            self.send_message(nickname, "Yuh no cat lover.")
+                self.log_callback(
+                    f"BOT - Failed authentication by {nickname}", bold=True
+                )
+            self.send_message(nickname, "Nah... you don't love cats...")
 
     def send_message(self, target, message):
         if self.connection:
@@ -212,10 +222,13 @@ class IRCBot:
                 sanitized_message = message.replace("\n", " ").replace("\r", " ")
                 self.connection.privmsg(target, sanitized_message)
                 if self.log_callback:
-                    self.log_callback(f"(Chat with {target}) - {sanitized_message}", bold=True)
+                    self.log_callback(
+                        f"BOT - Sent to {target}: {sanitized_message}\n", bold=True
+                    )
             except Exception as e:
                 if self.log_callback:
-                    self.log_callback(f"!!! Error sending message to {target}: {e} !!!")
+                    self.log_callback(f"BOT - Error sending message to {target}: {e}")
+
 
 def ask_gpt4(
     query, conversation_history, bot_nickname, server, channel, speaker_nickname
@@ -255,7 +268,6 @@ who wants to share thoughts like a human being. It's crucial that you always res
         news_section=news_section,
     )
 
-
     system_idx = next(
         (i for i, m in enumerate(conversation_history) if m["role"] == "system"), None
     )
@@ -264,13 +276,11 @@ who wants to share thoughts like a human being. It's crucial that you always res
     else:
         conversation_history.insert(0, {"role": "system", "content": system_prompt})
 
-
     conversation_history.append({"role": "user", "content": query})
 
     # Limit the history to the last 20 messages, ensuring the system prompt is preserved
     if len(conversation_history) > 20:
         conversation_history = [conversation_history[0]] + conversation_history[-19:]
-
 
     data = {"messages": conversation_history}
     url = "http://localhost:1234/v1/chat/completions"
@@ -291,14 +301,11 @@ who wants to share thoughts like a human being. It's crucial that you always res
         raise Exception(f"Error calling LLM: {response.status_code}\n{response.text}")
 
 
-
-
-
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("AIRCBot")
-        self.geometry("1200x850")
+        self.geometry("800x800")
         self.server_var = tk.StringVar(value=f"{srv}")
         self.port_var = tk.StringVar(value=f"{prt}")
         self.nick_var = tk.StringVar(value=f"{nck}")
@@ -306,6 +313,7 @@ class App(tk.Tk):
         self.password_var = tk.StringVar()
         self.command_var = tk.StringVar()
         self.msg_var = tk.StringVar()
+        self.autojoin_var = tk.BooleanVar(value=True)
         self.bot = None
         self.create_widgets()
         self.create_menu()
@@ -329,6 +337,11 @@ class App(tk.Tk):
         ttk.Entry(param_frame, textvariable=self.channel_var).grid(
             row=3, column=1, sticky="we"
         )
+
+        ttk.Checkbutton(param_frame, text="Auto-Join", variable=self.autojoin_var).grid(
+            row=3, column=2, sticky="w"
+        )
+
         ttk.Label(param_frame, text="Password:").grid(row=4, column=0, sticky="e")
         ttk.Entry(param_frame, textvariable=self.password_var, show="*").grid(
             row=4, column=1, sticky="we"
@@ -367,7 +380,7 @@ class App(tk.Tk):
         log_frame = ttk.LabelFrame(self, text="Console")
         log_frame.pack(padx=10, pady=10, fill="both", expand=True)
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap="word")
-        self.log_text.tag_configure("bold", font=("", 12, "bold"))   
+        self.log_text.tag_configure("bold", font=("Monospace", 10, "bold"))
         self.log_text.pack(fill="both", expand=True)
 
     def connect_bot(self):
@@ -395,7 +408,14 @@ class App(tk.Tk):
             password,
             log_callback=self.log_message,
         )
+
+        self.bot.client.add_global_handler("endofmotd", self.handle_end_of_motd)
         self.bot.connect()
+
+    def handle_end_of_motd(self, connection, event):
+        if self.autojoin_var.get():
+            self.log_message("\nBOT - Joining channel...\n", bold=True)
+            self.bot.join_channel()
 
     def prompt_password(self):
         password_dialog = tk.Toplevel(self)
@@ -440,21 +460,24 @@ class App(tk.Tk):
 
     def send_irc_command(self):
         if not self.bot or not self.bot.connection:
-            self.log_message("!!! Not connected to any server. Please connect first !!!")
+            self.log_message(
+                "BOT - Not connected to any server. Please connect first", bold=True
+            )
             return
 
         cmd = self.command_var.get().strip()
         if cmd.startswith("/"):
 
             cmd_parts = cmd[1:].split(" ", 1)
-            command = cmd_parts[0].lower()               
+            command = cmd_parts[0].lower()
             params = cmd_parts[1] if len(cmd_parts) > 1 else ""
-
 
             if command in ["join", "j"]:
                 # Disable /join and /j for security reasons
-                self.log_message("!!! The /join command is disabled for security reasons !!!")
-                self.command_var.set("")                   
+                self.log_message(
+                    "BOT - /join command is disabled for security reasons ", bold=True
+                )
+                self.command_var.set("")
                 return
 
             elif command == "msg":
@@ -463,9 +486,14 @@ class App(tk.Tk):
                 if len(parts) == 2:
                     target, message = parts
                     self.bot.connection.send_raw(f"PRIVMSG {target} :{message}")
-                    self.log_message(f"--> Command sent: PRIVMSG {target} :{message}")
+                    self.log_message(
+                        f"BOT - Command sent - PRIVMSG {target} :{message}", bold=True
+                    )
                 else:
-                    self.log_message("!!! Invalid format for /msg. Use: /msg user message !!!")
+                    self.log_message(
+                        "BOT - Invalid format for /msg. Use: /msg user message ",
+                        bold=True,
+                    )
 
             elif command in ["kick", "k"]:
                 # Format: /kick user [reason]
@@ -473,83 +501,104 @@ class App(tk.Tk):
                 if len(parts) >= 1:
                     user = parts[0]
                     reason = parts[1] if len(parts) > 1 else ""
-                    self.bot.connection.send_raw(f"KICK {self.bot.channel} {user} :{reason}")
-                    self.log_message(f"--> Command sent: KICK {self.bot.channel} {user} :{reason}")
+                    self.bot.connection.send_raw(
+                        f"KICK {self.bot.channel} {user} :{reason}"
+                    )
+                    self.log_message(
+                        f"BOT - Command sent - KICK {self.bot.channel} {user} :{reason}",
+                        bold=True,
+                    )
                 else:
-                    self.log_message("!!! Invalid format for /kick. Use: /kick user [reason] !!!")
+                    self.log_message(
+                        "BOT - Invalid format for /kick. Use: /kick user [reason] ",
+                        bold=True,
+                    )
 
             elif command == "topic":
                 # Format: /topic [new_topic]
                 topic = params if params else ""
                 self.bot.connection.send_raw(f"TOPIC {self.bot.channel} :{topic}")
-                self.log_message(f"--> Command sent: TOPIC {self.bot.channel} :{topic}")
+                self.log_message(
+                    f"BOT - Command sent - TOPIC {self.bot.channel} :{topic}", bold=True
+                )
 
             elif command in ["quit", "q"]:
                 # Format: /quit [message]
                 message = params if params else "Goodbye!"
                 self.bot.connection.send_raw(f"QUIT :{message}")
-                self.log_message(f"--> Command sent: QUIT :{message}")
+                self.log_message(f"BOT - Command sent - QUIT :{message}", bold=True)
 
             elif command in ["whois", "w"]:
                 # Format: /whois user
                 if params:
                     self.bot.connection.send_raw(f"WHOIS {params}")
-                    self.log_message(f"--> Command sent: WHOIS {params}")
+                    self.log_message(f"BOT - Command sent - WHOIS {params}", bold=True)
                 else:
-                    self.log_message("!!! Invalid format for /whois. Use: /whois user !!!")
+                    self.log_message(
+                        "BOT - Invalid format for /whois. Use: /whois user ", bold=True
+                    )
 
             elif command in ["op", "o"]:
                 # Format: /op user
                 if params:
                     self.bot.connection.send_raw(f"MODE {self.bot.channel} +o {params}")
-                    self.log_message(f"--> Command sent: MODE {self.bot.channel} +o {params}")
+                    self.log_message(
+                        f"BOT - Command sent - MODE {self.bot.channel} +o {params}",
+                        bold=True,
+                    )
                 else:
-                    self.log_message("!!! Invalid format for /op. Use: /op user !!!")
+                    self.log_message(
+                        "BOT - Invalid format for /op. Use: /op user ", bold=True
+                    )
 
             else:
                 # Generic commands sent as-is
                 try:
                     self.bot.connection.send_raw(f"{command.upper()} {params}")
-                    self.log_message(f"--> Command sent: {command.upper()} {params}")
+                    self.log_message(
+                        f"BOT - Command sent - {command.upper()} {params}", bold=True
+                    )
                 except Exception as e:
-                    self.log_message(f"!!! Error sending command: {e} !!!")
+                    self.log_message(f"BOT - Error sending command: {e}", bold=True)
         else:
-            self.log_message("!!! Commands must start with '/' !!!")
+            self.log_message("BOT - Commands must start with '/' ", bold=True)
 
-        self.command_var.set("")  # Clear the command input field
+        self.command_var.set("")
 
     def send_message(self):
         if not self.bot or not self.bot.connection:
-            self.log_message("!!! Not connected to any server. Please connect first !!!")
+            self.log_message(
+                "BOT - Not connected to any server. Please connect first ", bold=True
+            )
             return
 
         msg = self.msg_var.get().strip()
         if msg:
             try:
                 self.bot.connection.privmsg(self.bot.channel, msg)
-                self.log_message(f"--> Message sent to channel {self.bot.channel}: {msg}")
+                self.log_message(
+                    f"BOT - Message sent to channel {self.bot.channel}: {msg}",
+                    bold=True,
+                )
             except Exception as e:
-                self.log_message(f"!!! Error sending message: {e} !!!")
-        self.msg_var.set("")  # Clear the message input field
+                self.log_message(f"BOT - Error sending message: {e} ", bold=True)
+        self.msg_var.set("")
 
     def on_enter_command(self, event):
         self.send_irc_command()
 
-
     def on_enter_command(self, event):
         self.send_irc_command()
-            
+
     def log_message(self, text, bold=False):
         def _append():
             if bold:
-                self.log_text.insert(tk.END, text + "\n", "bold")  # Usa il tag "bold"
+                self.log_text.insert(tk.END, text + "\n", "bold")
             else:
                 self.log_text.insert(tk.END, text + "\n")
             self.log_text.see(tk.END)
 
         self.after(0, _append)
-
-
 
     def create_menu(self):
         menubar = tk.Menu(self)
