@@ -30,6 +30,8 @@ AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted
 - Features connection setup, message sending, and console logging.
 - Includes a detailed help menu for user guidance.
 
+![image](https://github.com/user-attachments/assets/903b3f12-d480-46ee-a7f3-ce6253f2f842)
+
 ---
 
 ## Requirements
