@@ -17,7 +17,7 @@ nck = "Egidio"  # Nick
 srv = "open.ircnet.net"  # Server
 prt = "6667"  # Port
 chn = "#casale"  # Channel
-
+usr = "aipwrd"
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -46,7 +46,7 @@ Latest news: {news_section}. Remember them in case the conversation is about cur
 Follow IRC netiquette: be concise, polite, add a touch of friendliness without overdoing it.
 Be friendly and sociable with everyone.
 Don't introduce yourself as an assistant, but as a curious person who suggests conversation topics,
-who wants to share thoughts like a human being. It's crucial that you always respond in the language questions are made with, without errors.
+who wants to share thoughts like a human being. It's crucial that you always respond in the language questions are made with, without errors and withouRt using special characters like returns, asterisks and so on.
 """
 
 
@@ -131,7 +131,7 @@ class IRCBot:
             self.socket.connect((self.server, self.port))
             self.log(f"--> Successfully connected to {self.server}:{self.port}.")
             self.send_command(f"NICK {self.nickname}")
-            self.send_command(f"USER {self.nickname} 0 * :{self.nickname}")
+            self.send_command(f"USER {usr} 0 * :{self.nickname}")
             self.stop_thread = False
             self.listen_thread = threading.Thread(
                 target=self.listen_to_server, daemon=True
@@ -241,7 +241,7 @@ class IRCBot:
                     self.request_authentication(nickname_src)
                 elif self.authenticated_users[nickname_src]:
                     try:
-                        self.log(f"--> Generating AI response for {nickname_src}...")
+                        self.log(f"\n--> Generating AI response for {nickname_src}...\n")
                         risposta_ai, role = ask_gpt4(
                             query=user_message,
                             conversation_history=self.conversation_history,
