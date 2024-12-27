@@ -1,6 +1,6 @@
 # AIRCBot: AI-powered IRC Bot with LLM Integration
 
-AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted language models to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio locally.
+AIRCBot is a Python-based IRC bot that interacts with a local language models to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio locally, but can be modified to use external APIs too. 
 
 ---
 
@@ -12,8 +12,8 @@ AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted
 - Authenticates users for private interactions.
 - Maintains a conversation history to provide contextually aware responses.
 - Supports automatic chat to queries
-- Limited interaction with channel (when receiving 'op' status, or if asked by user via UI)
-- HAS BUGS.
+- Limited interaction with channel (if asked by user via UI)
+- HAS Bugs. 
 
 ### AI-Powered Conversations
 - Uses a locally hosted language model (via LMStudio API) to respond to messages.
@@ -24,6 +24,8 @@ AIRCBot is a Python-based IRC bot that interacts with locally or remotely hosted
 ### Security
 - Requires password-based authentication for private messaging.
 - Implements anti-brute-force measures with temporary blocking for multiple failed login attempts.
+- Uses a local LLM by default to increase privacy. 
+- No secure connection support by now. 
 
 ### Graphical Interface
 - Provides a Tkinter-based GUI for managing the bot.
@@ -89,6 +91,8 @@ In the GUI, fill in the following fields:
 
 ## Usage
 
+Make sure your local LLM (eg. LMStudio) is up and running, then:
+
 1. **Start the Bot:**
    Launch the bot by running the script and clicking the "Connect" button in the GUI.
 
@@ -108,7 +112,7 @@ In the GUI, fill in the following fields:
 
 ---
 
-## Security Features
+## Other Security Notes
 
 ### Authentication
 - Users must authenticate with a password before initiating private conversations.
