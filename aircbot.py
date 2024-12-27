@@ -17,7 +17,7 @@ nck = "Egidio"  # Nick
 srv = "openirc.snt.utwente.nl"  # Server
 prt = "6667"  # Port
 chn = "#casale"  # Channel
-usr = "aipwrd"
+usr = "aipwrd" # User (for ident)
 
 
 def hash_password(password):
@@ -45,7 +45,7 @@ class IRCBot:
         self.last_attempt_time = {}
         self.client = irc.client.Reactor()
         self.connection = None
-        self.keep_alive_interval = 60  # Intervallo in secondi
+        self.keep_alive_interval = 60           
         self.logged_messages = set()
         self.exclude_keywords = [
             "end of names list",
@@ -126,11 +126,10 @@ class IRCBot:
 
     def handle_mode_event(self, connection, event):
         if len(event.arguments) >= 2:
-            mode_change = event.arguments[0]  # La modifica del mode (esempio: "+o")
-            target = event.arguments[1]  # Il nickname dell'utente coinvolto
-            source = irc.client.NickMask(event.source).nick  # Nickname di chi ha eseguito il comando
-
-            if mode_change == "+o" and target == self.nickname:  # Controlla se il bot è stato oppato
+            mode_change = event.arguments[0]               
+            target = event.arguments[1]               
+            source = irc.client.NickMask(event.source).nick   
+            if mode_change == "+o" and target == self.nickname:                   
                 self.log_callback(f"--> {source} has opped {self.nickname}")
                 self.send_message(self.channel, f"Thanks for op, {source}! :*")
 
@@ -138,11 +137,11 @@ class IRCBot:
         source = event.source.nick
         message = event.arguments[0]
 
-        # Log in grassetto
+
         if self.log_callback:
             self.log_callback(f"\n({source}) - {message}", bold=True)
 
-        # Gestisci l'autenticazione o genera una risposta
+
         if source not in self.authenticated_users:
             self.request_authentication(source)
         elif self.authenticated_users[source]:
@@ -256,7 +255,7 @@ who wants to share thoughts like a human being. It's crucial that you always res
         news_section=news_section,
     )
 
-    # Check if system prompt exists in the conversation history
+
     system_idx = next(
         (i for i, m in enumerate(conversation_history) if m["role"] == "system"), None
     )
@@ -265,21 +264,21 @@ who wants to share thoughts like a human being. It's crucial that you always res
     else:
         conversation_history.insert(0, {"role": "system", "content": system_prompt})
 
-    # Append the user's query
+
     conversation_history.append({"role": "user", "content": query})
 
     # Limit the history to the last 20 messages, ensuring the system prompt is preserved
     if len(conversation_history) > 20:
         conversation_history = [conversation_history[0]] + conversation_history[-19:]
 
-    # Prepare the payload
+
     data = {"messages": conversation_history}
     url = "http://localhost:1234/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
     }
 
-    # Send the request to the LLM
+    # Send request to LLM
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
         result = response.json()
@@ -368,8 +367,7 @@ class App(tk.Tk):
         log_frame = ttk.LabelFrame(self, text="Console")
         log_frame.pack(padx=10, pady=10, fill="both", expand=True)
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap="word")
-        self.log_text.tag_configure("bold", font=("", 12, "bold"))  # Tag per il grassetto
-
+        self.log_text.tag_configure("bold", font=("", 12, "bold"))   
         self.log_text.pack(fill="both", expand=True)
 
     def connect_bot(self):
@@ -447,16 +445,16 @@ class App(tk.Tk):
 
         cmd = self.command_var.get().strip()
         if cmd.startswith("/"):
-            # Remove the initial '/' to process the command
+
             cmd_parts = cmd[1:].split(" ", 1)
-            command = cmd_parts[0].lower()  # Normalize command to lowercase
+            command = cmd_parts[0].lower()               
             params = cmd_parts[1] if len(cmd_parts) > 1 else ""
 
-            # Handle specific commands with additional logic
+
             if command in ["join", "j"]:
                 # Disable /join and /j for security reasons
                 self.log_message("!!! The /join command is disabled for security reasons !!!")
-                self.command_var.set("")  # Clear the command input field
+                self.command_var.set("")                   
                 return
 
             elif command == "msg":
@@ -487,7 +485,7 @@ class App(tk.Tk):
                 self.log_message(f"--> Command sent: TOPIC {self.bot.channel} :{topic}")
 
             elif command in ["quit", "q"]:
-                # QUIT: /quit [message]
+                # Format: /quit [message]
                 message = params if params else "Goodbye!"
                 self.bot.connection.send_raw(f"QUIT :{message}")
                 self.log_message(f"--> Command sent: QUIT :{message}")
