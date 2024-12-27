@@ -7,6 +7,7 @@ import requests
 import feedparser
 from datetime import datetime
 import time
+import hashlib
 
 # Customize with your favourite feed
 FEED_URL = "https://www.ilsole24ore.com/rss/mondo.xml"
@@ -17,6 +18,8 @@ srv = "open.ircnet.net"  # Server
 prt = "6667"  # Port
 chn = "#casale"  # Channel
 
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def fetch_news_from_feed(max_items=5):
     feed = feedparser.parse(FEED_URL)
@@ -24,7 +27,6 @@ def fetch_news_from_feed(max_items=5):
     for entry in feed.entries[:max_items]:
         items.append({"title": entry.title, "link": entry.link})
     return items
-
 
 # Customize with your favourite prompt
 SYSTEM_PROMPT_TEMPLATE = """\ 
@@ -44,10 +46,7 @@ Don't introduce yourself as an assistant, but as a curious person who suggests c
 who wants to share thoughts like a human being. It's crucial that you always respond in the same language as the speaker, without errors.
 """
 
-
-def ask_gpt4(
-    query, conversation_history, bot_nickname, server, channel, speaker_nickname
-):
+def ask_gpt4(query, conversation_history, bot_nickname, server, channel, speaker_nickname):
     current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     news_items = fetch_news_from_feed(max_items=5)
     if news_items:
@@ -66,7 +65,6 @@ def ask_gpt4(
         news_section=news_section,
     )
 
-    # Adapt to match your local LLM or API (like OpenAI)
     system_idx = next(
         (i for i, m in enumerate(conversation_history) if m["role"] == "system"), None
     )
@@ -95,22 +93,13 @@ def ask_gpt4(
     else:
         raise Exception(f"Error calling LLM: {response.status_code}\n{response.text}")
 
-
 class IRCBot:
-    def __init__(
-        self,
-        server: str,
-        port: int,
-        nickname: str,
-        channel: str,
-        password: str,
-        log_callback=None,
-    ):
+    def __init__(self, server: str, port: int, nickname: str, channel: str, password: str, log_callback=None):
         self.server = server
         self.port = port
         self.nickname = nickname
         self.channel = channel
-        self.password = password
+        self.password_hash = hash_password(password)
         self.socket = None
         self.stop_thread = False
         self.conversation_history = []
@@ -129,9 +118,7 @@ class IRCBot:
             self.send_command(f"NICK {self.nickname}")
             self.send_command(f"USER {self.nickname} 0 * :{self.nickname}")
             self.stop_thread = False
-            self.listen_thread = threading.Thread(
-                target=self.listen_to_server, daemon=True
-            )
+            self.listen_thread = threading.Thread(target=self.listen_to_server, daemon=True)
             self.listen_thread.start()
         except socket.timeout:
             self.log("Connection timeout. Retrying...")
@@ -158,13 +145,15 @@ class IRCBot:
 
     def send_message(self, target: str, msg: str):
         irc_msg = f"PRIVMSG {target} :{msg}"
-        self.log(f"{self.nickname} -> {target}: {msg}")
         self.send_command(irc_msg)
 
     def send_command(self, raw_cmd: str):
         if self.socket and raw_cmd:
-            self.log(f"Command: {raw_cmd}")
-            self.socket.sendall((raw_cmd + "\r\n").encode("utf-8"))
+            self.log(f"> {raw_cmd}")
+            try:
+                self.socket.sendall((raw_cmd + "\r\n").encode("utf-8"))
+            except Exception as e:
+                self.log(f"Error sending command: {e}")
 
     def listen_to_server(self):
         buffer = ""
@@ -182,11 +171,10 @@ class IRCBot:
                 lines = buffer.split("\r\n")
                 buffer = lines.pop()
                 for line in lines:
-                    self.log(f"SERVER -> {line}")
+                    self.log(f"SERVER: {line}")
+                    if "ERROR" in line:
+                        self.log("Command rejected by server: " + line)
                     self.handle_irc_line(line)
-                    if " QUIT " in line:
-                        nickname = line.split("!")[0][1:]
-                        self.handle_user_quit(nickname)
             except Exception as e:
                 self.log(f"Error listening to server: {e}")
                 break
@@ -207,8 +195,6 @@ class IRCBot:
             if not nickname_src or nickname_src == self.nickname:
                 return
 
-            self.log(f"{nickname_src} -> {target}: {user_message}")
-
             if target == self.channel:
                 return
             else:
@@ -216,6 +202,7 @@ class IRCBot:
                     self.request_authentication(nickname_src)
                 elif self.authenticated_users[nickname_src]:
                     try:
+                        self.log(f"Generating AI response for {nickname_src}...")
                         risposta_ai, role = ask_gpt4(
                             query=user_message,
                             conversation_history=self.conversation_history,
@@ -224,7 +211,6 @@ class IRCBot:
                             channel=self.channel,
                             speaker_nickname=nickname_src,
                         )
-                        self.log(f"Answered {nickname_src}: {risposta_ai}")
                         self.send_message(nickname_src, risposta_ai)
                     except Exception as e:
                         risposta_ai = f"[AI Error] {e}"
@@ -242,13 +228,13 @@ class IRCBot:
         current_time = time.time()
         if nickname in self.failed_attempts:
             if self.failed_attempts[nickname] >= 3:
-                if current_time - self.last_attempt_time[nickname] < 60:
+                if current_time - self.last_attempt_time[nickname] < 120:
                     self.log(f"User {nickname} is temporarily blocked.")
                     return
                 else:
                     self.failed_attempts[nickname] = 0
 
-        if password == self.password:
+        if hash_password(password) == self.password_hash:
             self.authenticated_users[nickname] = True
             self.failed_attempts[nickname] = 0
             self.log(f"User {nickname} authenticated.")
@@ -259,15 +245,9 @@ class IRCBot:
             self.log(f"Failed authentication by {nickname}.")
             self.send_message(nickname, "Nah...")
 
-    def handle_user_quit(self, nickname):
-        self.log(f"User {nickname} left channel.")
-        if nickname in self.authenticated_users:
-            del self.authenticated_users[nickname]
-
     def log(self, text: str):
         if self.log_callback:
             self.log_callback(text)
-
 
 class App(tk.Tk):
     def __init__(self):
@@ -291,40 +271,22 @@ class App(tk.Tk):
         param_frame = ttk.LabelFrame(self, text="Connection")
         param_frame.pack(padx=10, pady=10, fill="x")
 
-        ttk.Label(param_frame, text="Server:").grid(
-            row=0, column=0, sticky="e", padx=5, pady=5
-        )
-        ttk.Entry(param_frame, textvariable=self.server_var).grid(
-            row=0, column=1, sticky="we", padx=5, pady=5
-        )
+        ttk.Label(param_frame, text="Server:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        server_entry = ttk.Entry(param_frame, textvariable=self.server_var)
+        server_entry.grid(row=0, column=1, sticky="we", padx=5, pady=5)
 
-        ttk.Label(param_frame, text="Port:").grid(
-            row=1, column=0, sticky="e", padx=5, pady=5
-        )
-        ttk.Entry(param_frame, textvariable=self.port_var).grid(
-            row=1, column=1, sticky="we", padx=5, pady=5
-        )
+        ttk.Label(param_frame, text="Port:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        port_entry = ttk.Entry(param_frame, textvariable=self.port_var)
+        port_entry.grid(row=1, column=1, sticky="we", padx=5, pady=5)
 
-        ttk.Label(param_frame, text="Nick:").grid(
-            row=2, column=0, sticky="e", padx=5, pady=5
-        )
-        ttk.Entry(param_frame, textvariable=self.nick_var).grid(
-            row=2, column=1, sticky="we", padx=5, pady=5
-        )
+        ttk.Label(param_frame, text="Nick:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+        ttk.Entry(param_frame, textvariable=self.nick_var).grid(row=2, column=1, sticky="we", padx=5, pady=5)
 
-        ttk.Label(param_frame, text="Channel:").grid(
-            row=3, column=0, sticky="e", padx=5, pady=5
-        )
-        ttk.Entry(param_frame, textvariable=self.channel_var).grid(
-            row=3, column=1, sticky="we", padx=5, pady=5
-        )
+        ttk.Label(param_frame, text="Channel:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+        ttk.Entry(param_frame, textvariable=self.channel_var).grid(row=3, column=1, sticky="we", padx=5, pady=5)
 
-        ttk.Label(param_frame, text="Password:").grid(
-            row=4, column=0, sticky="e", padx=5, pady=5
-        )
-        ttk.Entry(param_frame, textvariable=self.password_var, show="*").grid(
-            row=4, column=1, sticky="we", padx=5, pady=5
-        )
+        ttk.Label(param_frame, text="Password:").grid(row=4, column=0, sticky="e", padx=5, pady=5)
+        ttk.Entry(param_frame, textvariable=self.password_var, show="*").grid(row=4, column=1, sticky="we", padx=5, pady=5)
 
         for i in range(5):
             param_frame.columnconfigure(i, weight=1)
@@ -332,19 +294,13 @@ class App(tk.Tk):
         action_frame = ttk.Frame(self)
         action_frame.pack(padx=10, pady=5, fill="x")
 
-        self.connect_button = ttk.Button(
-            action_frame, text="Connect", command=self.connect_bot
-        )
+        self.connect_button = ttk.Button(action_frame, text="Connect", command=self.connect_bot)
         self.connect_button.pack(side="left", padx=5)
 
-        self.join_button = ttk.Button(
-            action_frame, text="Join Channel", command=self.join_channel
-        )
+        self.join_button = ttk.Button(action_frame, text="Join Channel", command=self.join_channel)
         self.join_button.pack(side="left", padx=5)
 
-        self.disconnect_button = ttk.Button(
-            action_frame, text="Disconnect", command=self.disconnect_bot
-        )
+        self.disconnect_button = ttk.Button(action_frame, text="Disconnect", command=self.disconnect_bot)
         self.disconnect_button.pack(side="left", padx=5)
 
         msg_frame = ttk.LabelFrame(self, text="Send message to channel")
@@ -352,9 +308,7 @@ class App(tk.Tk):
 
         msg_entry = ttk.Entry(msg_frame, textvariable=self.msg_var)
         msg_entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
-        ttk.Button(msg_frame, text="Send", command=self.send_message).pack(
-            side="right", padx=5, pady=5
-        )
+        ttk.Button(msg_frame, text="Send", command=self.send_message).pack(side="right", padx=5, pady=5)
 
         cmd_frame = ttk.LabelFrame(self, text="IRC Command")
         cmd_frame.pack(padx=10, pady=10, fill="x")
@@ -363,9 +317,7 @@ class App(tk.Tk):
         cmd_entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
         cmd_entry.bind("<Return>", self.on_enter_command)
 
-        ttk.Button(cmd_frame, text="Send", command=self.send_irc_command).pack(
-            side="right", padx=5, pady=5
-        )
+        ttk.Button(cmd_frame, text="Send", command=self.send_irc_command).pack(side="right", padx=5, pady=5)
 
         log_frame = ttk.LabelFrame(self, text="Console")
         log_frame.pack(padx=10, pady=10, fill="both", expand=True)
@@ -400,14 +352,14 @@ class App(tk.Tk):
             "3. Disconnect: Disconnect the bot from the IRC server.\n"
             "   - Note: Do not leave the bot online unattended to avoid misuse.\n\n"
             "** Sending Messages and Commands **\n"
-            "1. Send message: Enter a message in the text field and press Send button to send it to current channel.\n"
+            "1. Send message: Enter a message in the text field and press Send button to send it to current channel, like with a regular IRC client.\n"
             '2. Send Command: Enter a raw IRC command (e.g., "WHO", "MODE") in the field and press Enter or Send button to send it.\n\n'
             "** Console **\n"
             "1. Console logs all bot activities: connections, commands sent, messages received, etc.\n"
             "2. Use the console to monitor bot's interaction with IRC server.\n\n"
             "** Authentication **\n"
             "1. If a user sends a direct message to the bot, authentication with a password is requested.\n"
-            "2. User has three attempts to authenticate before being temporarily blocked for 60 seconds.\n"
+            "2. User has three attempts to authenticate before being temporarily blocked for 120 seconds to discourage brute force.\n"
             "3. Once authenticated, the user can freely interact with the bot.\n"
             "   - Tip: Ensure passwords are not shared publicly to maintain security.\n\n"
             "** Feature Limitations **\n"
@@ -442,12 +394,11 @@ class App(tk.Tk):
 
     def connect_bot(self):
         server = self.server_var.get()
-        port = int(self.port_var.get())
+        port = self.port_var.get()
         nickname = self.nick_var.get()
         channel = self.channel_var.get()
         password = self.password_var.get()
-        
-        # Password check on connection
+
         if not password:
             messagebox.showerror(
                 "Password Required",
@@ -455,8 +406,13 @@ class App(tk.Tk):
                 "Please enter a strong one in the appropriate field.",
             )
             return
+
+        if not server or not port.isdigit() or not (1 <= int(port) <= 65535):
+            messagebox.showerror("Invalid Input", "Please provide a valid server and port.")
+            return
+
         self.bot = IRCBot(
-            server, port, nickname, channel, password, log_callback=self.log_message
+            server, int(port), nickname, channel, password, log_callback=self.log_message
         )
         self.bot.connect()
 
@@ -487,7 +443,6 @@ class App(tk.Tk):
             self.bot.send_command(cmd)
             self.command_var.set("")
 
-
     def on_enter_command(self, event):
         self.send_irc_command()
 
@@ -497,7 +452,6 @@ class App(tk.Tk):
             self.log_text.see(tk.END)
 
         self.after(0, _append)
-
 
 if __name__ == "__main__":
     app = App()
