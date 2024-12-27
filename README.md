@@ -113,6 +113,10 @@ Make sure your local LLM (eg. LMStudio) is up and running, then:
 5. **News Integration:**
    - The bot fetches the latest news headlines and includes them in responses when relevant.
 
+6. **Notes on LMStudio**
+   - Tested with: Temp 0.55-0.65 / Response Lenght 100-150 / Context 2000tk
+   - Similar results with different LLMs
+
 ---
 
 ## Other Security Notes
