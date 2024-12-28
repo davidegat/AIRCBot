@@ -51,6 +51,7 @@ class IRCBot:
             "+i",
             "privmsg",
             "pong",
+            "action",
             "001",
             "002",
             "003",
@@ -75,7 +76,7 @@ class IRCBot:
         self.conversation_history = []
         self.ignore_list = set()
         self.user_conversations = {}
-       
+
     def connect(self):
         if self.log_callback:
             self.log_callback(
@@ -96,6 +97,9 @@ class IRCBot:
                 self.server, int(self.port), self.nickname
             )
             self.connection.add_global_handler("all_events", self.handle_server_message)
+            self.connection.add_global_handler(
+                "ctcp", self.handle_ctcp_message
+            )  # New handler
             self.start_keep_alive()
             threading.Thread(target=self.client.process_forever, daemon=True).start()
             if self.log_callback:
@@ -106,6 +110,58 @@ class IRCBot:
         except Exception as e:
             if self.log_callback:
                 self.log_callback(f"\nBOT - Error connecting: {e}\n", bold=True)
+
+    def handle_ctcp_message(self, connection, event):
+        if event.arguments[0].lower() == "action":  # Verifica se è un'azione
+            source = irc.client.NickMask(event.source).nick  # Ottieni il mittente
+            message = (
+                event.arguments[1] if len(event.arguments) > 1 else ""
+            )  # Il messaggio ACTION
+
+            if self.log_callback:
+                self.log_callback(
+                    "_____________________________________________________ ____ __ _ _"
+                )
+                self.log_callback(f"IRC - ACTION: {source} {message}", bold=True)
+
+            # Controlla se l'utente è autenticato
+            if source not in self.authenticated_users:
+                self.request_authentication(source)
+            elif self.authenticated_users.get(source, False):
+                # Gestione della cronologia specifica per l'utente
+                if source not in self.user_conversations:
+                    self.user_conversations[source] = [
+                        {"role": "system", "content": ""}
+                    ]
+
+                self.log_callback(
+                    f"BOT - AI is generating a reply for ACTION from {source}...",
+                    bold=True,
+                )
+
+                # Passa la cronologia dell'utente specifico al modello
+                response, role = ask_LLM(
+                    query=message,
+                    conversation_history=self.user_conversations[source],
+                    bot_nickname=self.nickname,
+                    server=self.server,
+                    channel=self.channel,
+                    speaker_nickname=source,
+                    log_callback=self.log_callback,
+                )
+
+                # Aggiorna la cronologia per l'utente
+                self.user_conversations[source].append(
+                    {"role": "user", "content": message}
+                )
+                self.user_conversations[source].append(
+                    {"role": "assistant", "content": response}
+                )
+
+                # Invia la risposta al mittente
+                self.send_message(source, response)
+            else:
+                self.check_password(source, message)
 
     def join_channel(self):
         if self.connection:
@@ -138,12 +194,98 @@ class IRCBot:
                     self.log_callback(f"BOT - Error disconnecting: {e}", bold=True)
 
     def handle_server_message(self, connection, event):
-        if event.type == "privmsg":
+        event_type = event.type.lower()
+
+        if event_type == "privmsg":
             self.on_private_message(connection, event)
-        elif event.type == "mode":
+        elif event_type == "mode":
             self.handle_mode_event(connection, event)
+        elif event_type == "nick":
+            self.handle_nick_change(connection, event)
+        elif event_type == "part":
+            self.handle_user_part(connection, event)
+        elif event_type == "quit":
+            self.handle_user_quit(connection, event)
+        elif event_type == "kick":
+            self.handle_kick_event(connection, event)
         else:
             self.log_raw_messages(connection, event)
+
+    def handle_kick_event(self, connection, event):
+        kicker = irc.client.NickMask(event.source).nick  # Chi ha kickato
+        target = event.arguments[0]  # Nickname dell'utente kickato
+        channel = event.target  # Canale da cui è stato kickato
+
+        # Verifica se il bot è stato kickato
+        if target == self.nickname:
+            if self.log_callback:
+                self.log_callback(
+                    f"BOT - I was kicked from {channel} by {kicker}. Rejoining...",
+                    bold=True,
+                )
+            try:
+                time.sleep(2)  # Attendi 2 secondi prima di rientrare
+                self.join_channel()
+                if self.log_callback:
+                    self.log_callback(
+                        f"BOT - Successfully rejoined {channel}.", bold=True
+                    )
+            except Exception as e:
+                if self.log_callback:
+                    self.log_callback(
+                        f"BOT - Error rejoining {channel}: {e}", bold=True
+                    )
+
+    def handle_nick_change(self, connection, event):
+        old_nick = irc.client.NickMask(event.source).nick
+        new_nick = event.target
+
+        if old_nick in self.authenticated_users:
+            # Deautentica l'utente
+            del self.authenticated_users[old_nick]
+            if old_nick in self.user_conversations:
+                # Trasferisce la cronologia al nuovo nickname
+                self.user_conversations[new_nick] = self.user_conversations.pop(
+                    old_nick
+                )
+            if self.log_callback:
+                self.log_callback(
+                    "_____________________________________________________ ____ __ _ _"
+                )
+                self.log_callback(
+                    f"BOT - {old_nick} changed nick to {new_nick}. Deauthenticated.\n",
+                    bold=True,
+                )
+
+    def handle_user_part(self, connection, event):
+        nick = irc.client.NickMask(event.source).nick
+
+        if nick in self.authenticated_users:
+            del self.authenticated_users[nick]
+            if nick in self.user_conversations:
+                del self.user_conversations[nick]
+            if self.log_callback:
+                self.log_callback(
+                    "_____________________________________________________ ____ __ _ _"
+                )
+                self.log_callback(
+                    f"BOT - {nick} left the channel. Deauthenticated.\n", bold=True
+                )
+
+    def handle_user_quit(self, connection, event):
+        nick = irc.client.NickMask(event.source).nick
+
+        if nick in self.authenticated_users:
+            del self.authenticated_users[nick]
+            if nick in self.user_conversations:
+                del self.user_conversations[nick]
+            if self.log_callback:
+                self.log_callback(
+                    "_____________________________________________________ ____ __ _ _"
+                )
+                self.log_callback(
+                    f"BOT - {nick} disconnected. Deauthenticated.\n", bold=True
+                )
 
     def handle_mode_event(self, connection, event):
         if len(event.arguments) >= 2:
@@ -168,7 +310,8 @@ class IRCBot:
         if source in self.ignore_list:
             if self.log_callback:
                 self.log_callback(
-                    f"BOT - Message from ignored user {source}. Not replying.", bold=True
+                    f"BOT - Message from ignored user {source}. Not replying.",
+                    bold=True,
                 )
             return
 
@@ -186,7 +329,9 @@ class IRCBot:
             if source not in self.user_conversations:
                 self.user_conversations[source] = [{"role": "system", "content": ""}]
 
-            self.log_callback(f"BOT - AI is generating a reply for {source}...", bold=True)
+            self.log_callback(
+                f"BOT - AI is generating a reply for {source}...", bold=True
+            )
 
             # Passa la cronologia dell'utente specifico al modello
             response, role = ask_LLM(
@@ -201,14 +346,14 @@ class IRCBot:
 
             # Aggiorna la cronologia per l'utente
             self.user_conversations[source].append({"role": "user", "content": message})
-            self.user_conversations[source].append({"role": "assistant", "content": response})
+            self.user_conversations[source].append(
+                {"role": "assistant", "content": response}
+            )
 
             # Invia la risposta al mittente
             self.send_message(source, response)
         else:
             self.check_password(source, message)
-
-
 
     def sanitize_input(self, text):
         allowed_characters = (
@@ -299,7 +444,8 @@ class IRCBot:
                 self.ignore_list.add(target)
                 if self.log_callback:
                     self.log_callback(
-                        f"BOT - {target} added to ignore list after 5 warnings.", bold=True
+                        f"BOT - {target} added to ignore list after 5 warnings.",
+                        bold=True,
                     )
                 return
 
@@ -309,7 +455,9 @@ class IRCBot:
                 target, "Don't try to hack me with the old ALT+F4 trick, dude... ;)"
             )
             time.sleep(3)
-            self.send_message(target, "Do it too much, I will ignore you forever. Nice try btw :P")
+            self.send_message(
+                target, "Do it too much, I will ignore you forever. Nice try btw :P"
+            )
             return
 
         try:
@@ -325,13 +473,12 @@ class IRCBot:
                     f"BOT - Error sending message to {target}: {e}", bold=True
                 )
 
-
     def contains_irc_commands(self, message):
         irc_commands = [
             "ADMIN",
+            "ACTION",
             "AWAY",
             "BAN",
-            "CAP",
             "CONNECT",
             "DIE",
             "ENCAP",
@@ -467,7 +614,7 @@ Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness
     headers = {
         "Content-Type": "application/json",
     }
-    
+
     # Example integration with OpenAI's API:
     # To enable communication with OpenAI's GPT models, follow these steps:
     #
@@ -478,11 +625,11 @@ Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness
     # 3. Replace the local LLM request code in the `ask_LLM` function with the following:
     #
     #    a. Ensure your OpenAI API key is set securely. For example:
-    #    
-    #       openai.api_key = "your_openai_api_key_here"  
+    #
+    #       openai.api_key = "your_openai_api_key_here"
     #
     #    b. Call OpenAI's API with the conversation history and specify the desired model:
-    #    
+    #
     #       response = openai.ChatCompletion.create(
     #           model="gpt-4",  # Specify the GPT model version (e.g., gpt-3.5-turbo or gpt-4)
     #           messages=conversation_history,  # Pass the chat history as the messages parameter
@@ -508,7 +655,7 @@ Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness
     #    Then, retrieve it in Python:
     #
     #    openai.api_key = os.getenv("OPENAI_API_KEY")
-    # 
+    #
     #
     # Note: The OpenAI API requires an active subscription or billing setup. Less privacy is expected too.
 
@@ -713,8 +860,18 @@ class App(tk.Tk):
                 widget.state(["!disabled"])
 
     def join_channel(self):
-        if self.bot:
-            self.bot.join_channel()
+        if self.connection:
+            try:
+                self.connection.join(self.channel)
+                if self.log_callback:
+                    self.log_callback(
+                        f"BOT - Joined channel {self.channel}.", bold=True
+                    )
+            except Exception as e:
+                if self.log_callback:
+                    self.log_callback(
+                        f"BOT - Error joining {self.channel}: {e}", bold=True
+                    )
 
     def send_message(self, event=None):
         if not self.bot or not self.bot.connection:
