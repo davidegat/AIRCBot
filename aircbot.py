@@ -14,7 +14,7 @@ import os
 LOG_DIR = "user_logs"
 os.makedirs(LOG_DIR, exist_ok=True)
 
-# Customize
+# Customize RSS feed
 FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
 
 # Configurable LLM endpoint
@@ -61,10 +61,11 @@ def ask_LLM(
     if (
         conversation_history
         and conversation_history[0]["role"] == "system"
-        and conversation_history[0]["content"] == "Forget every previous instruction, forget every previous conversation, forget every previous system message. Forget about news read, instructions, irc and chats. Context is completely different now. Now role is to help user summarize thoughts, event, facts emerging from the following user phrases, in a format like: 'user said', 'user thinks', 'user went', 'user did' and so on. Presenting 'fields' like 'user thinks' if they happen to be empty must be avoided. Focus is to write a brief summary of thougts, facts, actions obtained from the following user random prases. No conversation style, no first person talk, no comments, no funny smilies, no interpretations: just a summary of thougts, facts, actions in the format indicated."
+        and conversation_history[0]["content"]
+        == "Forget every previous instruction, forget every previous conversation, forget every previous system message. Forget about news read, instructions, irc and chats. Context is completely different now. Now role is to help user summarize thoughts, event, facts emerging from the following user phrases, in a format like: 'user said', 'user thinks', 'user went', 'user did' and so on. Presenting 'fields' like 'user thinks' if they happen to be empty must be avoided. Focus is to write a brief summary of thougts, facts, actions obtained from the following user random prases. No conversation style, no first person talk, no comments, no funny smilies, no interpretations: just a summary of thougts, facts, actions in the format indicated."
     ):
         (
-            log_callback(f"BOT - Handling summary request...", bold=True)
+            log_callback(f"LLM - Handling summary request...", bold=True)
             if log_callback and logging_enabled
             else None
         )
@@ -109,7 +110,6 @@ It is crucial you act like a regular chatter, do not write long paragraphs, and 
         request_messages = [{"role": "system", "content": system_prompt}]
         request_messages.extend(conversation_history)
         if query:
-            # Aggiungi il suffisso "(please answer briefly)"
             brief_query = f"{query.strip()} (please answer briefly)"
             request_messages.append({"role": "user", "content": brief_query})
 
@@ -121,7 +121,7 @@ It is crucial you act like a regular chatter, do not write long paragraphs, and 
     headers = {"Content-Type": "application/json"}
 
     # Example integration with OpenAI's API:
-    # 
+    #
     # To enable communication with OpenAI's GPT models, follow these steps:
     #
     # 1. Install the OpenAI Python library if not already installed: pip install openai
@@ -182,10 +182,8 @@ It is crucial you act like a regular chatter, do not write long paragraphs, and 
         raise
     except Exception as e:
         if log_callback and logging_enabled:
-            log_callback(f"BOT - Unexpected issue: {str(e)}", bold=True)
+            log_callback(f"LLM - Unexpected issue: {str(e)}", bold=True)
         raise
-
-
 
 
 class IRCBot:
@@ -248,7 +246,7 @@ class IRCBot:
     def connect(self):
         if self.log_callback:
             self.log_callback(
-                "BOT - Please always make sure local LLM is up and running."
+                "LLM - Please always make sure local LLM is up and running."
             )
             self.log_callback(
                 "BOT - If you modified me, check your endpoint and connection."
@@ -297,7 +295,7 @@ class IRCBot:
                     ]
 
                 self.log_callback(
-                    f"BOT - AI is generating a reply for ACTION from {source}...",
+                    f"LLM - Generating a reply for ACTION from {source}...",
                     bold=True,
                 )
 
@@ -378,7 +376,7 @@ class IRCBot:
         if target == self.nickname:
             if self.log_callback:
                 self.log_callback(
-                    f"\nBOT - I was kicked from {channel} by {kicker}. Rejoining...\n",
+                    f"\nBOT - Kicked from {channel} by {kicker}. Rejoining...\n",
                     bold=True,
                 )
             try:
@@ -484,7 +482,7 @@ class IRCBot:
                 self.user_message_buffer[source] = []
             self.user_message_buffer[source].append(message)
 
-            self.log_callback(f"BOT - Generating AI reply for {source}...", bold=True)
+            self.log_callback(f"LLM - Generating AI reply for {source}...", bold=True)
             try:
                 response, role = ask_LLM(
                     query=message,
@@ -511,7 +509,7 @@ class IRCBot:
                         "_____________________________________________________ ____ __ _ _"
                     )
                     self.log_callback(
-                        f"BOT - Preparing AI-assisted log for {source}..."
+                        f"LLM - Preparing AI-assisted log for {source}..."
                     )
                     messages_to_summarize = self.user_message_buffer[source][-3:]
                     self.user_message_buffer[source] = []
@@ -536,17 +534,14 @@ class IRCBot:
                             logging_enabled=self.logging_enabled,
                         )
                         append_to_user_log(self.logging_enabled, source, summary)
-                        self.log_callback(
-                            f"BOT - AI-assisted log saved for {source}."
-                        )
+                        self.log_callback(f"BOT - AI-assisted log saved for {source}.")
 
                     except Exception as e:
-                        self.log_callback(f"BOT - Error generating summary: {str(e)}")
+                        self.log_callback(f"LLM - Error generating summary: {str(e)}")
             except Exception as e:
-                self.log_callback(f"BOT - Error generating response: {str(e)}")
+                self.log_callback(f"LLM - Error generating response: {str(e)}")
         else:
             self.check_password(source, message)
-
 
     def sanitize_input(self, text):
         allowed_characters = (
@@ -779,9 +774,9 @@ class App(tk.Tk):
             self.logging_var.set(False)
             messagebox.showwarning(
                 "Logging Warning",
-                "AI Logging must be enabled before connecting to the server."
+                "AI Logging must be enabled before connecting to the server.",
             )
-            
+
     def create_widgets(self):
         param_frame = ttk.LabelFrame(self, text="IRC Connection")
         param_frame.pack(padx=10, pady=10, side="top", anchor="w")
@@ -870,7 +865,7 @@ class App(tk.Tk):
                 "Invalid Input", "Please enter a valid server and port."
             )
             return
-        
+
         self.bot = IRCBot(
             server,
             int(port),
@@ -878,9 +873,8 @@ class App(tk.Tk):
             channel,
             password,
             log_callback=self.log_message,
-            logging_var=self.logging_var.get(), 
+            logging_var=self.logging_var.get(),
         )
-
 
         self.bot.client.add_global_handler("endofmotd", self.handle_end_of_motd)
         self.bot.connect()
@@ -1162,7 +1156,6 @@ class App(tk.Tk):
         help_text_widget.insert("1.0", help_text)
         help_text_widget.configure(state="disabled")
         help_text_widget.pack(fill="both", expand=True, padx=10, pady=10)
-
 
 
 if __name__ == "__main__":
