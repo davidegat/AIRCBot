@@ -82,7 +82,7 @@ pip install requests feedparser
    ```bash
    python aircbot.py
    ```
-3. ***LLM (LMStudio)
+3. **LLM (LMStudio)**
    Make sure your local LLM is up and running before connecting to IRC server.
    
 ---
