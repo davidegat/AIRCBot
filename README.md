@@ -1,6 +1,6 @@
 # AIRCBot: AI-powered IRC Bot with local LLM Integration
 
-No, not Discord: IRC. This is a generally useless project for a Python-based IRC bot that interacts with a local language models, to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio (https://lmstudio.ai/) locally.
+No, not Discord: IRC. This is a generally useless project for a Python-based IRC bot that interacts with a local large language model, to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio (https://lmstudio.ai/) locally.
 
 You can easily modify this software to use external APIs if needed (instructions in code comments).
 
