@@ -58,8 +58,8 @@ Ensure the following libraries are installed and available:
 - `datetime`
 - `hashlib`
 - `irc` (irc.client)
-- If you plan to change the code, consider also `openai`. Please refer to OpenAI documentation for API access.
-  
+
+If you plan to change the code, consider also `openai`. Please refer to OpenAI documentation for API access.
 
 Install missing dependencies using (example):
 ```bash
