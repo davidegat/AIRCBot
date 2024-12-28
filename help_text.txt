@@ -1,0 +1,60 @@
+AIRCBot Help:
+
+1. Connection Parameters:
+   - Server: Specify the IRC server to connect to.
+   - Port: Enter the server's port number (default is usually 6667).
+   - Nick: Choose the nickname the bot will use.
+   - Channel: Define the channel to join (e.g., #example).
+   - Password: Provide a password to authenticate the bot.
+   - Auto-Join: If enabled, the bot will automatically join the specified channel upon connection.
+   - Enable AI Logging: If enabled, the bot will log summarized conversations for authenticated users.
+     (Note: Logging must be enabled before connecting to the server).
+
+2. Actions:
+   - Connect: Establishes a connection to the specified IRC server using the provided parameters.
+   - Join Channel: Manually joins the specified channel if the bot is already connected.
+   - Disconnect: Disconnects the bot from the IRC server.
+
+3. Messaging:
+   - Use the message field to send a message to the connected channel.
+   - Press the 'Send' button or the Enter key to deliver your message.
+
+4. IRC Commands:
+   - Enter an IRC command (e.g., /nick newnick) in the command field and press 'Send'.
+   - Supported commands:
+     - /msg user message: Sends a private message to a specific user.
+     - /kick user [reason]: Removes a user from the channel (optional reason).
+     - /topic [new_topic]: Changes the channel topic.
+     - /quit [message]: Disconnects from the server with an optional goodbye message.
+     - /whois user: Retrieves information about a user.
+     - /op user: Grants operator privileges to a user.
+   - Note: Some commands (e.g., /join) are disabled for security reasons.
+
+5. AI Interaction:
+   - The bot can generate replies to messages from authenticated users using the configured LLM endpoint.
+   - AI responses are concise and conversational, following IRC netiquette.
+   - User queries are suffixed with '(please answer briefly)' to ensure short responses.
+
+6. AI Logging:
+   - If enabled, the bot logs summaries of conversations with authenticated users.
+   - Summaries are stored in the 'user_logs' directory with one log file per user.
+   - Logging must be enabled before connecting to the server.
+
+7. Authentication:
+   - Users must pass a simple authentication step (e.g., 'Do you love cats?') to interact with the bot.
+   - After three failed authentication attempts, users are temporarily blocked for 15 minutes.
+   - Authenticated users can interact with the bot, and their messages are included in conversation history.
+
+8. Troubleshooting:
+   - Ensure the server and port details are correct.
+   - Verify your internet connection if the bot fails to connect.
+   - Use a strong password for better security.
+   - Make sure the LLM endpoint is up and running before starting the bot.
+
+9. Console:
+   - Displays server messages, bot activity logs, and user interactions.
+   - Useful for monitoring bot behavior and debugging issues.
+
+10. Additional Notes:
+   - The bot automatically re-joins a channel if it is kicked out.
+   - Commands and messages sent by the bot are logged in the console for review.
