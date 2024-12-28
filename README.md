@@ -13,6 +13,7 @@ You can easily modify this software to use external APIs, if needed (instruction
 - Supports IRC commands and responses.
 - Authenticates users for private interactions.
 - Maintains a conversation history to provide contextually aware responses.
+- Features a personal conversation history for each user.
 - Supports automatic chat to queries.
 - Limited interaction with channel (if asked by user via UI, or if OP status is given).
 
@@ -135,8 +136,8 @@ Make sure your local LLM is up and running, then:
 - Multiple messages sent to the bot are queued. This must be handled in the future, to avoid overloads.
 - Do not leave your bot unattended, or in background, to avoid abuse by users or breaking server ToS.
 - Removing password protection from code seems not a good idea, but you decide.
-- If you plan to allow bot access to other users **keep in mind** that conversation history is shared. Do not provide personal or sensitive details that you don't want to be revealed by the bot.
-- Only one password is allowed to be set, choose a ***new one*** before sharing it to other users. Do not reuse your own passwords.
+- Conversation history is different from each user.
+- Only one password is allowed to be set, choose a **new one** before sharing it to other users. Do not reuse your own passwords.
   
 ---
 
