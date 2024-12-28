@@ -182,5 +182,5 @@ AIRCBot is open-source software. See the LICENSE file for details.
 
 ---
 
-For questions, contributions, or feature requests, feel free to contact the project maintainer or open an issue in the repository.
+For questions, contributions, or feature requests, feel free to contact the project maintainer or open an issue in the repository. Software is provided as-is, by using it you accept to take all responsibility for any damage of any kind this software may cause to your data, device(s), firm, corporation, shop, family, friends, whole life, belongings, backyard, dignity and other moral and psycological stuff, yourself or your cats.
 
