@@ -10,29 +10,29 @@ You can easily modify this software to use external APIs, if needed.
 
 ### General
 - Connects to IRC servers and channels.
-- Supports basic IRC commands and responses.
+- Supports IRC commands and responses.
 - Authenticates users for private interactions.
 - Maintains a conversation history to provide contextually aware responses.
-- Supports automatic chat to queries
-- Limited interaction with channel (if asked by user via UI, or if OP status is given)
+- Supports automatic chat to queries.
+- Limited interaction with channel (if asked by user via UI, or if OP status is given).
 
 ### AI-Powered Conversations
 - Uses a locally hosted language model (via LMStudio API - download: https://lmstudio.ai/) to respond to messages.
-- Can be adapted to use remote API (like OpenAI)
+- Can be adapted to use remote API (like OpenAI).
 - Natural, context-aware language generation prompt, adapted for IRC interactions.
 - Fetches and references the latest news for conversations about current events.
 
 ### Security
 - Requires password-based authentication for private messaging.
-- Implements basic anti-brute-force measures with temporary blocking for multiple failed login attempts.
+- Implements basic anti-brute-force measures with temporary blocking for failed login attempts.
 - Uses a local LLM by default to increase privacy. 
 - Secure connection support.
-- Sanitized to avoid LLM to send raw commandS to The IRC server.
+- Sanitized to avoid LLM to send raw commands to The IRC server if prompted to do so.
 
 ### Graphical Interface
 - Provides a Tkinter-based GUI for managing the bot.
 - Features connection setup, message sending, and console logging.
-- Includes a detailed help menu for user guidance.
+- Includes help menu for user guidance.
 
 ![image](https://github.com/user-attachments/assets/384b1112-b769-4e05-92d0-8d642bfd3d80)
 ![image](https://github.com/user-attachments/assets/19530dc6-fd81-4e5f-b6f3-726a2fc4b0b2)
@@ -44,8 +44,9 @@ You can easily modify this software to use external APIs, if needed.
 ### System Requirements
 - Python 3.9 or later.
 - Internet connection for IRC and RSS feed integration.
-- LMStudio (https://lmstudio.ai/) or equivalent local/remote language model API. Bot is configured to use LMStudio at `http://localhost:1234/v1/chat/completions`.
-- Code is has comments to the lines you can customize, like defaults (nick, server, port), RSS feed address and API connection.
+- LMStudio (https://lmstudio.ai/) or equivalent local language model API.
+- Bot is configured to use LMStudio API at `http://localhost:1234/v1/chat/completions` endpoint.
+- If you can't run a local LLM model, follow comments in the code to use your own external endpoint (like OpenAI API - Please refer to OpenAI documentation for API access).
 
 ### Python Libraries
 Ensure the following libraries are installed and available:
@@ -57,6 +58,7 @@ Ensure the following libraries are installed and available:
 - `datetime`
 - `hashlib`
 - `irc` (irc.client)
+- If you plan to change the code, consider also `openai`. Please refer to OpenAI documentation for API access.
   
 
 Install missing dependencies using (example):
@@ -80,7 +82,9 @@ pip install requests feedparser
    ```bash
    python aircbot.py
    ```
-
+3. ***LLM (LMStudio)
+   Make sure your local LLM is up and running before connecting to IRC server.
+   
 ---
 
 ## Configuration
@@ -128,13 +132,14 @@ Make sure your local LLM is up and running, then:
 ### Authentication
 - Users must authenticate with a password before initiating private conversations.
 - After three failed attempts, users are temporarily blocked for 60 seconds.
+- Multiple messages are queued (this must be handled in the future, to avoid overload).
 
 ### Logs
 - All interactions and commands are logged in the console for transparency and debugging.
 
 ### Suggestions
 - Do not leave the bot unattended, or in background, to avoid abuse.
-- Removing the password protection from code is not a good idea, but you decide.
+- Removing password protection from code seems not a good idea, but you decide.
   
 ---
 
