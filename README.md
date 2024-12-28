@@ -22,15 +22,6 @@ You can easily modify this software to use external APIs, if needed.
 - Natural, context-aware language generation prompt, adapted for IRC interactions.
 - Fetches and references the latest news for conversations about current events.
 
-### Security
-- Requires password-based authentication for private messaging.
-- Implements basic anti-brute-force measures with temporary blocking for failed login attempts.
-- Uses a local LLM by default to increase privacy. 
-- Secure connection support.
-- Sanitized to avoid LLM to send raw commands to The IRC server if prompted to do so.
-
-![image](https://github.com/user-attachments/assets/be642317-2619-4c68-a952-23a0f47bc731)
-
 ### Graphical Interface
 - Provides a Tkinter-based GUI for managing the bot.
 - Features connection setup, message sending, and console logging.
@@ -38,6 +29,15 @@ You can easily modify this software to use external APIs, if needed.
 
 ![image](https://github.com/user-attachments/assets/384b1112-b769-4e05-92d0-8d642bfd3d80)
 ![image](https://github.com/user-attachments/assets/19530dc6-fd81-4e5f-b6f3-726a2fc4b0b2)
+
+### Security
+- Requires password-based authentication for private messaging.
+- Implements basic anti-brute-force measures with temporary blocking for failed login attempts.
+- Uses a local LLM by default to increase privacy. 
+- Secure connection support.
+- Sanitized to avoid LLM to send raw commands to The IRC server if prompted to do so.
+
+![image](https://github.com/user-attachments/assets/f21ea601-8cc8-4a9f-8d90-7084c0271f87)
 
 ---
 
