@@ -2,7 +2,7 @@
 
 AIRCBot is a Python-based IRC bot that interacts with a local language models to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio (https://lmstudio.ai/) locally.
 
-You can easily modify this software to use external APIs, if needed. 
+You can easily modify this software to use external APIs, if needed (instructions in code comments. 
 
 ---
 
@@ -49,7 +49,7 @@ You can easily modify this software to use external APIs, if needed.
 - Internet connection for IRC and RSS feed integration.
 - LMStudio (https://lmstudio.ai/) or equivalent local language model API.
 - Bot is configured to use LMStudio API at `http://localhost:1234/v1/chat/completions` endpoint.
-- If you can't run a local LLM model, follow comments in the code to use your own external endpoint (like OpenAI API - Please refer to OpenAI documentation for API access).
+- If you can't run a local LLM model, follow instruction in the code comments to use your own external endpoint (like OpenAI API - Please refer to OpenAI documentation for API access).
 
 ### Python Libraries
 Ensure the following libraries are installed and available:
