@@ -15,19 +15,6 @@ SYSTEM_PROMPT_FILE = "system_prompt.txt"
 SUMMARY_PROMPT_FILE = "summary_prompt.txt"
 HELP_TEXT_FILE = "help_text.txt"
 
-
-def load_prompt(file_path):
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            return file.read()
-    except FileNotFoundError:
-        return ""
-
-
-SYSTEM_PROMPT_TEMPLATE = load_prompt(SYSTEM_PROMPT_FILE)
-SUMMARY_PROMPT_TEMPLATE = load_prompt(SUMMARY_PROMPT_FILE)
-HELP_TEXT = load_prompt(HELP_TEXT_FILE)
-
 # Log dir configuration
 LOG_DIR = "user_logs"
 os.makedirs(LOG_DIR, exist_ok=True)
