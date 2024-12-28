@@ -145,7 +145,7 @@ Make sure your local LLM is up and running, then:
 Some features are not supported to avoid complexity, and for security reasons:
 - Supports only one channel at a time, to avoid excessive exposure.
 - Does not handle CTCP (Client-To-Client Protocol) or DCC (Direct Client-to-Client) connections.
-- Requires local hosting of the LMStudio model to increase privacy, but can be modified to use an external API.
+- Requires local hosting of the LMStudio model to increase privacy, but can be modified to use an external API (see examples in code comments).
 
 ---
 
