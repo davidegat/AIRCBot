@@ -22,6 +22,7 @@ You can easily modify this software to use external APIs if needed (instructions
 - Natural, context-aware language generation prompt, adapted for IRC interactions.
 - Fetches and references the latest news for conversations about current events.
 - Also aware of: time, date, irc server, own nickname, user nickname.
+- Messages sent to the LLM include a "(please answer briefly)" suffix to ensure concise responses.
 
 ### Graphical Interface
 - Provides a Tkinter-based GUI for managing the bot and monitor its activity.
@@ -41,6 +42,12 @@ You can easily modify this software to use external APIs if needed (instructions
 - Implements ignore system for users tricking LLM into generating raw commands (ignore list resets when program restarts).
 
 ![image](https://github.com/user-attachments/assets/f21ea601-8cc8-4a9f-8d90-7084c0271f87)
+
+### Logging Features
+- The bot logs summaries of conversations for authenticated users in the `user_logs` directory.
+- Logs are generated with AI assistance, summarizing the last three user messages in a concise paragraph.
+- Logging must be enabled in the interface before connecting to the IRC server.
+- Each user's conversation history is saved in a separate file for easier review.
 
 ---
 
@@ -130,7 +137,11 @@ Make sure your local LLM is up and running, then:
    - The bot fetches latest 3 news headlines and includes them in responses when/if relevant, or if asked to.
    - You can customize the RSS feed by changing the variable on top of code (see code comments).
 
-7. **Notes on LMStudio**
+7. **AI-Assisted Summaries:**
+   - If logging is enabled, the bot will summarize user interactions every three messages.
+   - Summaries are concise and saved to the `user_logs` directory under the user's nickname.
+
+8. **Notes on LMStudio**
    - Tested with: Temp 0.55-0.65 / Response Lenght 100-150 / Context 2000tk
    - Similar results with different models, pick your favourite.
    - Download https://lmstudio.ai/
@@ -201,4 +212,3 @@ AIRCBot is open-source software. See the LICENSE file for details.
 ---
 
 For questions, contributions, or feature requests, feel free to contact the project maintainer or open an issue in the repository. Software is provided as-is, by using it you accept to take all responsibility for any damage of any kind this software may cause to your data, device(s), firm, corporation, shop, family, friends, whole life, belongings, backyard, dignity and other moral and psycological stuff, your body or your cats'.
-
