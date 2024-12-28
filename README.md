@@ -48,12 +48,13 @@ You can easily modify this software to use external APIs, if needed.
 - Code is has comments to the lines you can customize, like defaults (nick, server, port), RSS feed address and API connection.
 
 ### Python Libraries
-Ensure the following libraries are installed:
+Ensure the following libraries are installed and available:
 - `tkinter`
 - `requests`
 - `feedparser`
 - `threading`
 - `time`
+- `datetime`
 - `hashlib`
 - `irc` (irc.client)
   
