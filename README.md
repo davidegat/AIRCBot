@@ -1,6 +1,6 @@
 # AIRCBot: AI-powered IRC Bot with local LLM Integration
 
-AIRCBot is a Python-based IRC bot that interacts with a local language models to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio locally, 
+AIRCBot is a Python-based IRC bot that interacts with a local language models to provide conversational AI capabilities. The bot is capable of joining an IRC channel, responding to direct messages, fetching the latest news, and managing authenticated user interactions. This document outlines how to install, configure, and use AIRCBot effectively with LMStudio (https://lmstudio.ai/) locally.
 
 You can easily modify this software to use external APIs, if needed. 
 
@@ -17,7 +17,7 @@ You can easily modify this software to use external APIs, if needed.
 - Limited interaction with channel (if asked by user via UI, or if OP status is given)
 
 ### AI-Powered Conversations
-- Uses a locally hosted language model (via LMStudio API) to respond to messages.
+- Uses a locally hosted language model (via LMStudio API - download: https://lmstudio.ai/) to respond to messages.
 - Can be adapted to use remote API (like OpenAI)
 - Natural, context-aware language generation prompt, adapted for IRC interactions.
 - Fetches and references the latest news for conversations about current events.
@@ -44,7 +44,7 @@ You can easily modify this software to use external APIs, if needed.
 ### System Requirements
 - Python 3.9 or later.
 - Internet connection for IRC and RSS feed integration.
-- LMStudio or equivalent local/remote language model API. Bot is configured to use LMStudio at `http://localhost:1234/v1/chat/completions`.
+- LMStudio (https://lmstudio.ai/) or equivalent local/remote language model API. Bot is configured to use LMStudio at `http://localhost:1234/v1/chat/completions`.
 - Code is has comments to the lines you can customize, like defaults (nick, server, port), RSS feed address and API connection.
 
 ### Python Libraries
@@ -96,7 +96,7 @@ In the GUI, fill in the following fields:
 
 ## Usage
 
-Make sure your local LLM (eg. LMStudio) is up and running, then:
+Make sure your local LLM is up and running, then:
 
 1. **Start the Bot:**
    Launch the bot by running the script and clicking the "Connect" button in the GUI.
@@ -118,6 +118,7 @@ Make sure your local LLM (eg. LMStudio) is up and running, then:
 6. **Notes on LMStudio**
    - Tested with: Temp 0.55-0.65 / Response Lenght 100-150 / Context 2000tk
    - Similar results with different LLMs
+   - Download https://lmstudio.ai/
 
 ---
 
