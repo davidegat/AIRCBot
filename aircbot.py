@@ -73,7 +73,8 @@ class IRCBot:
             "376",
         ]
         self.conversation_history = []
-
+        self.ignore_list = set()
+        
     def connect(self):
         if self.log_callback:
             self.log_callback(
@@ -86,7 +87,7 @@ class IRCBot:
                 "_____________________________________________________ ____ __ _ _"
             )
             self.log_callback(
-                f"BOT - Connecting to IRC ({self.server} on port {self.port})...",
+                f"BOT - Connecting to IRC ({self.server} port {self.port})...",
                 bold=True,
             )
         try:
@@ -153,10 +154,23 @@ class IRCBot:
                     "_____________________________________________________ ____ __ _ _"
                 )
                 self.send_message(self.channel, f"Thanks for @ {source}! :*")
+            if mode_change == "+v" and target == self.nickname:
+                self.log_callback(
+                    "_____________________________________________________ ____ __ _ _"
+                )
+                self.send_message(self.channel, f"Thanks for Voice {source}! :*")
 
     def on_private_message(self, connection, event):
         source = event.source.nick
         message = event.arguments[0]
+
+        if source in self.ignore_list:
+            if self.log_callback:
+                self.log_callback(
+                    f"BOT - Message from ignored user {source}. Not replying.",
+                    bold=True,
+                )
+            return
 
         if self.log_callback:
             self.log_callback(
@@ -170,7 +184,7 @@ class IRCBot:
             self.log_callback(
                 f"BOT - AI is generating a reply for {source}...", bold=True
             )
-            response, role = ask_gpt4(
+            response, role = ask_LLM(
                 query=message,
                 conversation_history=self.conversation_history,
                 bot_nickname=self.nickname,
@@ -184,9 +198,10 @@ class IRCBot:
         else:
             self.check_password(source, message)
 
+
     def sanitize_input(self, text):
         allowed_characters = (
-            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 =^❤òàèéùçÈ€%$£'.,;:!?()-_+@*äöüßÄÖÜâêîôûÂÊÎÔÛëïËÏÉÀÙ"
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 =^❤òàèéùçìÈ€%$£'.,;:!?()-_+@*äöüßÄÖÜâêîôûÂÊÎÔÛëïËÏÉÀÙ"
             "øåæØÅÆčćđšžČĆĐŠŽāēīūģķļņĀĒĪŪĢĶĻŅąęłńśźżĄĘŁŃŚŹŻñÑ"
         )
         sanitized = "".join(ch for ch in text if ch in allowed_characters).strip()
@@ -213,7 +228,7 @@ class IRCBot:
                 if current_time - self.last_attempt_time[nickname] < 900:
                     if self.log_callback:
                         self.log_callback(
-                            f"BOT - User {nickname} is blocked for 15 minutes.",
+                            f"BOT - User {nickname} blocked for 15 minutes.",
                             bold=True,
                         )
                     return
@@ -233,7 +248,7 @@ class IRCBot:
             self.last_attempt_time[nickname] = current_time
             if self.log_callback:
                 self.log_callback(
-                    f"BOT - Failed authentication attempt ({nickname})", bold=True
+                    f"BOT - Failed authentication ({nickname})", bold=True
                 )
             self.send_message(nickname, "Nah, you don't...")
 
@@ -243,21 +258,47 @@ class IRCBot:
                 self.log_callback("BOT - Not connected.", bold=True)
             return
 
+        if target in self.ignore_list:
+            if self.log_callback:
+                self.log_callback(f"BOT - Ignored {target}.", bold=True)
+            return
+
         sanitized_message = self.sanitize_input(message)
         if self.contains_irc_commands(sanitized_message):
             if self.log_callback:
                 self.log_callback(
-                    f"BOT - Raw IRC command detected: {sanitized_message}", bold=True
+                    "_____________________________________________________ ____ __ _ _"
                 )
-            self.send_message(target, "Nope! It may trigger a raw command!")
-            time.sleep(3)
-            self.send_message(
-                target, "I will not shot raw commands at your will LOL :D"
-            )
+                self.log_callback(
+                    f"BOT - AI sending RAW command '{sanitized_message}'. Blocked!",
+                    bold=True,
+                )
+                self.log_callback(
+                    f"BOT - User {target} is trying to mess around with prompts...'.",
+                    bold=True,
+                )
+                self.log_callback(
+                    "_____________________________________________________ ____ __ _ _"
+                )
+
+            self.failed_attempts[target] = self.failed_attempts.get(target, 0) + 1
+
+            if self.failed_attempts[target] >= 5:
+                self.send_message(target, "You've been ignored for this session.")
+                self.ignore_list.add(target)
+                if self.log_callback:
+                    self.log_callback(
+                        f"BOT - {target} added to ignore list after 5 warnings.", bold=True
+                    )
+                return
+
+            self.send_message(target, "I'm not stupid! It may trigger a raw command!")
             time.sleep(3)
             self.send_message(
                 target, "Don't try to hack me with the old ALT+F4 trick, dude... ;)"
             )
+            time.sleep(3)
+            self.send_message(target, "Do it too much, I will ignore you forever. Nice try btw :P")
             return
 
         try:
@@ -272,6 +313,7 @@ class IRCBot:
                 self.log_callback(
                     f"BOT - Error sending message to {target}: {e}", bold=True
                 )
+
 
     def contains_irc_commands(self, message):
         irc_commands = [
@@ -352,7 +394,7 @@ class IRCBot:
             self.log_callback(f"IRC - {sanitized_message}")
 
 
-def ask_gpt4(
+def ask_LLM(
     query,
     conversation_history,
     bot_nickname,
@@ -415,6 +457,50 @@ who wants to share thoughts like a human being. It's crucial that you always res
     headers = {
         "Content-Type": "application/json",
     }
+    
+    # Example integration with OpenAI's API:
+    # To enable communication with OpenAI's GPT models, follow these steps:
+    #
+    # 1. Install the OpenAI Python library if not already installed: pip install openai
+    #
+    # 2. Import the library at the top of your script: import openai
+    #
+    # 3. Replace the local LLM request code in the `ask_LLM` function with the following:
+    #
+    #    a. Ensure your OpenAI API key is set securely. For example:
+    #    
+    #       openai.api_key = "your_openai_api_key_here"  
+    #
+    #    b. Call OpenAI's API with the conversation history and specify the desired model:
+    #    
+    #       response = openai.ChatCompletion.create(
+    #           model="gpt-4",  # Specify the GPT model version (e.g., gpt-3.5-turbo or gpt-4)
+    #           messages=conversation_history,  # Pass the chat history as the messages parameter
+    #           temperature=0.7,  # Adjust temperature for response variability (optional)
+    #       )
+    #
+    #    c. Extract the assistant's message content and role from the response:
+    #
+    #       assistant_message = response["choices"][0]["message"]
+    #       content = assistant_message["content"]
+    #       role = assistant_message["role"]
+    #
+    #    d: Append the assistant's message to the conversation history:
+    #
+    #       conversation_history.append(assistant_message)
+    #       return content, role
+    #
+    # 4. Replace `your_openai_api_key_here` with your actual API key or store it securely in environment variables.
+    #    Example of setting the API key in your environment:
+    #
+    #    export OPENAI_API_KEY="your_openai_api_key_here"
+    #
+    #    Then, retrieve it in Python:
+    #
+    #    openai.api_key = os.getenv("OPENAI_API_KEY")
+    # 
+    #
+    # Note: The OpenAI API requires an active subscription or billing setup. Be mindful of usage costs.
 
     try:
         # Send request to local LLM
