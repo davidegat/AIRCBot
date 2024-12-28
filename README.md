@@ -14,7 +14,7 @@ You can easily modify this software to use external APIs, if needed.
 - Authenticates users for private interactions.
 - Maintains a conversation history to provide contextually aware responses.
 - Supports automatic chat to queries
-- Limited interaction with channel (if asked by user via UI)
+- Limited interaction with channel (if asked by user via UI, or if OP status is given)
 - HAS Bugs. 
 
 ### AI-Powered Conversations
