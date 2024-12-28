@@ -132,21 +132,15 @@ Make sure your local LLM is up and running, then:
 
 ## Other Security Notes
 
-### Authentication
-- Users must authenticate with a password before initiating private conversations.
-- After three failed attempts, users are temporarily blocked for 60 seconds.
-- Multiple messages are queued (this must be handled in the future, to avoid overload).
-
-### Logs
-- All interactions and commands are logged in the console for transparency and debugging.
-
-### Suggestions
-- Do not leave the bot unattended, or in background, to avoid abuse.
+- Multiple messages sent to the bot are queued. This must be handled in the future, to avoid overloads.
+- Do not leave your bot unattended, or in background, to avoid abuse by users or breaking server ToS.
 - Removing password protection from code seems not a good idea, but you decide.
+- If you plan to allow bot access to other users **keep in mind** that conversation history is shared. Do not provide personal or sensitive details that you don't want to be revealed by the bot.
+- Only one password is allowed to be set, choose a ***new one*** before sharing it to other users. Do not reuse your own passwords.
   
 ---
 
-## Limitations
+## Other Limitations
 
 Some features are not supported to avoid complexity, and for security reasons:
 - Supports only one channel at a time, to avoid excessive exposure.
