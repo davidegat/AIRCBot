@@ -77,6 +77,15 @@ class IRCBot:
     def connect(self):
         if self.log_callback:
             self.log_callback(
+                "BOT - Please always make sure local LLM is up and running."
+            )
+            self.log_callback(
+                "BOT - If you modified me, check your endpoint and connection."
+            )
+            self.log_callback(
+                "_____________________________________________________ ____ __ _ _"
+            )
+            self.log_callback(
                 f"BOT - Connecting to IRC ({self.server} on port {self.port})...",
                 bold=True,
             )
@@ -158,7 +167,9 @@ class IRCBot:
         if source not in self.authenticated_users:
             self.request_authentication(source)
         elif self.authenticated_users.get(source, False):
-            self.log_callback(f"BOT - AI is generating a reply for {source}...", bold=True)
+            self.log_callback(
+                f"BOT - AI is generating a reply for {source}...", bold=True
+            )
             response, role = ask_gpt4(
                 query=message,
                 conversation_history=self.conversation_history,
@@ -166,13 +177,19 @@ class IRCBot:
                 server=self.server,
                 channel=self.channel,
                 speaker_nickname=source,
+                log_callback=self.log_callback,
             )
+
             self.send_message(source, response)
         else:
             self.check_password(source, message)
 
     def sanitize_input(self, text):
-        sanitized = "".join(ch for ch in text if ord(ch) < 128).strip()
+        allowed_characters = (
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 =^❤òàèéùçÈ€%$£'.,;:!?()-_+@*äöüßÄÖÜâêîôûÂÊÎÔÛëïËÏÉÀÙ"
+            "øåæØÅÆčćđšžČĆĐŠŽāēīūģķļņĀĒĪŪĢĶĻŅąęłńśźżĄĘŁŃŚŹŻñÑ"
+        )
+        sanitized = "".join(ch for ch in text if ch in allowed_characters).strip()
         return sanitized
 
     def request_authentication(self, nickname):
@@ -230,10 +247,17 @@ class IRCBot:
         if self.contains_irc_commands(sanitized_message):
             if self.log_callback:
                 self.log_callback(
-                    f"BOT - Raw IRC command detected: {sanitized_message}",
-                    bold=True,
+                    f"BOT - Raw IRC command detected: {sanitized_message}", bold=True
                 )
-            self.send_message(target, "That might trigger a raw command! I can’t answer, sorry :)")
+            self.send_message(target, "Nope! It may trigger a raw command!")
+            time.sleep(3)
+            self.send_message(
+                target, "I will not shot raw commands at your will LOL :D"
+            )
+            time.sleep(3)
+            self.send_message(
+                target, "Don't try to hack me with the old ALT+F4 trick, dude... ;)"
+            )
             return
 
         try:
@@ -329,7 +353,13 @@ class IRCBot:
 
 
 def ask_gpt4(
-    query, conversation_history, bot_nickname, server, channel, speaker_nickname
+    query,
+    conversation_history,
+    bot_nickname,
+    server,
+    channel,
+    speaker_nickname,
+    log_callback=None,
 ):
     current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     news_items = fetch_news_from_feed(max_items=5)
@@ -386,19 +416,39 @@ who wants to share thoughts like a human being. It's crucial that you always res
         "Content-Type": "application/json",
     }
 
-    # Send request to local LLM
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
+    try:
+        # Send request to local LLM
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()  # Raise exception for HTTP errors
         result = response.json()
         assistant_message = result["choices"][0]["message"]
         content = assistant_message["content"]
         role = assistant_message["role"]
         conversation_history.append(assistant_message)
         return content, role
-    else:
-        raise Exception(
-            f"BOT - Error calling LLM: {response.status_code}\n{response.text}"
-        )
+    except requests.exceptions.ConnectionError as e:
+        if log_callback:
+            log_callback(
+                "_____________________________________________________ ____ __ _ _"
+            )
+            log_callback(
+                f"BOT - LLM unreachable! Make sure local LLM is up and running!",
+                bold=True,
+            )
+            log_callback(
+                f"BOT - If you modified my code to use external APIs, please", bold=True
+            )
+            log_callback(
+                f"BOT - double check your endpoint and internet connection!", bold=True
+            )
+            log_callback(
+                "_____________________________________________________ ____ __ _ _"
+            )
+        raise
+    except Exception as e:
+        if log_callback:
+            log_callback(f"BOT - Unexpected issue: {str(e)}", bold=True)
+        raise
 
 
 class App(tk.Tk):
@@ -419,7 +469,7 @@ class App(tk.Tk):
         self.create_menu()
 
     def create_widgets(self):
-        param_frame = ttk.LabelFrame(self, text="Connection")
+        param_frame = ttk.LabelFrame(self, text="IRC Connection")
         param_frame.pack(padx=10, pady=10, side="top", anchor="w")
         ttk.Label(param_frame, text="Server:").grid(row=0, column=0, sticky="e")
         ttk.Entry(param_frame, textvariable=self.server_var).grid(
