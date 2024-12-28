@@ -202,7 +202,7 @@ Some features are not supported to avoid complexity, or for security reasons:
    - Reply quality and length depend upon which model you are using and relative settings, not on this program.
    - The included prompt is generally okay; you may want to change it to experiment with different results.
    - Also, try using different models and settings for different results.
-   - Keep values low on your LLM (or parameters in the code if using an external API): short response (100-150 tokens), short context (2000-300), not too much temperature (0.55-0.65).
+   - Keep values low on your LLM (or parameters in the code if using an external API): short response (100-150 tokens), short context (2000-3000), not too much temperature (0.55-0.65).
 
 ---
 
