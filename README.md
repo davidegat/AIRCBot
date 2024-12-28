@@ -29,6 +29,8 @@ You can easily modify this software to use external APIs, if needed.
 - Secure connection support.
 - Sanitized to avoid LLM to send raw commands to The IRC server if prompted to do so.
 
+![image](https://github.com/user-attachments/assets/be642317-2619-4c68-a952-23a0f47bc731)
+
 ### Graphical Interface
 - Provides a Tkinter-based GUI for managing the bot.
 - Features connection setup, message sending, and console logging.
