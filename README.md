@@ -36,7 +36,7 @@ You can easily modify this software to use external APIs, if needed.
 - Uses a local LLM by default to increase privacy. 
 - Secure connection support.
 - Sanitized to avoid LLM to send raw commands to The IRC server if prompted to do so.
-- Implements ignore system for users tricking LLM into generating raw commands.
+- Implements ignore system for users tricking LLM into generating raw commands (ignore list resets when program restarts).
 
 ![image](https://github.com/user-attachments/assets/f21ea601-8cc8-4a9f-8d90-7084c0271f87)
 
