@@ -160,7 +160,7 @@ Some features are not supported to avoid complexity, and for security reasons:
 
 2. **Authentication Fails:**
    - Verify the correct password is entered.
-   - Wait 60 seconds if temporarily blocked.
+   - Wait if temporarily blocked.
 
 3. **AI Response Errors:**
    - Ensure LMStudio is running and accessible at `http://localhost:1234/v1/chat/completions`.
