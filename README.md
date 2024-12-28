@@ -15,7 +15,6 @@ You can easily modify this software to use external APIs, if needed.
 - Maintains a conversation history to provide contextually aware responses.
 - Supports automatic chat to queries
 - Limited interaction with channel (if asked by user via UI, or if OP status is given)
-- HAS Bugs. 
 
 ### AI-Powered Conversations
 - Uses a locally hosted language model (via LMStudio API) to respond to messages.
@@ -27,7 +26,8 @@ You can easily modify this software to use external APIs, if needed.
 - Requires password-based authentication for private messaging.
 - Implements basic anti-brute-force measures with temporary blocking for multiple failed login attempts.
 - Uses a local LLM by default to increase privacy. 
-- No secure connection support by now. 
+- Secure connection support.
+- Sanitized to avoid LLM to send raw commandS to The IRC server.
 
 ### Graphical Interface
 - Provides a Tkinter-based GUI for managing the bot.
