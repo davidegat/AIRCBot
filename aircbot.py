@@ -6,17 +6,15 @@ import requests
 import feedparser
 from datetime import datetime
 import time
-from time import sleep
 import hashlib
 import irc.client
 
 # Customize
 FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
-usr = "aipwrd"  # User (for ident)
 
 # Default options at startup (user can modify them via UI)
 nck = "Egidio"  # Nick
-srv = "openirc.snt.utwente.nl"  # Server
+srv = "ssl.ircnet.ovh"  # Server
 prt = "6667"  # Port
 chn = "#casale"  # Channel
 
@@ -25,7 +23,7 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def fetch_news_from_feed(max_items=3):
+def fetch_news_from_feed(max_items=2):
     feed = feedparser.parse(FEED_URL)
     items = []
     for entry in feed.entries[:max_items]:
@@ -72,13 +70,14 @@ class IRCBot:
             "366",
             "372",
             "375",
+            "376",
         ]
         self.conversation_history = []
 
     def connect(self):
         if self.log_callback:
             self.log_callback(
-                f"BOT - Connecting to IRC... ({self.server} on port {self.port})",
+                f"BOT - Connecting to IRC ({self.server} on port {self.port})...",
                 bold=True,
             )
         try:
@@ -89,13 +88,13 @@ class IRCBot:
             self.start_keep_alive()
             threading.Thread(target=self.client.process_forever, daemon=True).start()
             if self.log_callback:
-                self.log_callback(f"BOT - Server {self.server} is up!", bold=True)
+                self.log_callback(f"BOT - {self.server} is up!", bold=True)
                 self.log_callback(
                     "_____________________________________________________ ____ __ _ _"
                 )
         except Exception as e:
             if self.log_callback:
-                self.log_callback(f"\nBOT - Error while connecting: {e}\n", bold=True)
+                self.log_callback(f"\nBOT - Error connecting: {e}\n", bold=True)
 
     def join_channel(self):
         if self.connection:
@@ -158,8 +157,8 @@ class IRCBot:
 
         if source not in self.authenticated_users:
             self.request_authentication(source)
-        elif self.authenticated_users[source]:
-            self.log_callback(f"BOT - AI generating reply for {source}...", bold=True)
+        elif self.authenticated_users.get(source, False):
+            self.log_callback(f"BOT - AI is generating a reply for {source}...", bold=True)
             response, role = ask_gpt4(
                 query=message,
                 conversation_history=self.conversation_history,
@@ -172,23 +171,9 @@ class IRCBot:
         else:
             self.check_password(source, message)
 
-    def log_raw_messages(self, connection, event):
-        raw_message = " ".join(event.arguments).strip() if event.arguments else ""
-        normalized_message = raw_message.lstrip("-:").strip()
-        message_signature = hashlib.sha256(normalized_message.encode()).hexdigest()
-
-        if message_signature in self.logged_messages:
-            return
-
-        if any(
-            keyword.lower() in normalized_message.lower()
-            for keyword in self.exclude_keywords
-        ):
-            return
-
-        self.logged_messages.add(message_signature)
-        if self.log_callback:
-            self.log_callback(f"IRC - {normalized_message}")
+    def sanitize_input(self, text):
+        sanitized = "".join(ch for ch in text if ord(ch) < 128).strip()
+        return sanitized
 
     def request_authentication(self, nickname):
         if self.log_callback:
@@ -205,12 +190,13 @@ class IRCBot:
 
     def check_password(self, nickname, password):
         current_time = time.time()
+
         if nickname in self.failed_attempts:
             if self.failed_attempts[nickname] >= 3:
-                if current_time - self.last_attempt_time[nickname] < 120:
+                if current_time - self.last_attempt_time[nickname] < 900:
                     if self.log_callback:
                         self.log_callback(
-                            f"BOT - User {nickname} is bruteforcing? Blocked for 2 mins.",
+                            f"BOT - User {nickname} is blocked for 15 minutes.",
                             bold=True,
                         )
                     return
@@ -218,35 +204,128 @@ class IRCBot:
                     self.failed_attempts[nickname] = 0
 
         if hash_password(password) == self.password_hash:
-            self.authenticated_users[nickname] = True
-            if self.log_callback:
-                self.log_callback(f"BOT - {nickname} is now authenticated.", bold=True)
-            self.send_message(nickname, "U luv cats! (=^_^=) ❤")
+            if not self.authenticated_users.get(nickname, False):
+                self.authenticated_users[nickname] = True
+                if self.log_callback:
+                    self.log_callback(
+                        f"BOT - {nickname} is now authenticated.", bold=True
+                    )
+                self.send_message(nickname, "U luv cats! (=^_^=) ❤")
         else:
             self.failed_attempts[nickname] = self.failed_attempts.get(nickname, 0) + 1
             self.last_attempt_time[nickname] = current_time
             if self.log_callback:
                 self.log_callback(
-                    f"BOT - Failed authentication ({nickname})", bold=True
+                    f"BOT - Failed authentication attempt ({nickname})", bold=True
                 )
             self.send_message(nickname, "Nah, you don't...")
 
     def send_message(self, target, message):
         if not self.connection:
             if self.log_callback:
-                self.log_callback("BOT - Not connected to server.", bold=True)
+                self.log_callback("BOT - Not connected.", bold=True)
+            return
+
+        sanitized_message = self.sanitize_input(message)
+        if self.contains_irc_commands(sanitized_message):
+            if self.log_callback:
+                self.log_callback(
+                    f"BOT - Raw IRC command detected: {sanitized_message}",
+                    bold=True,
+                )
+            self.send_message(target, "That might trigger a raw command! I can’t answer, sorry :)")
             return
 
         try:
-            self.connection.privmsg(target, message)
+            self.connection.privmsg(target, sanitized_message)
             if self.log_callback:
-                self.log_callback(f"BOT - AI reply to {target}: {message}", bold=True)
+                self.log_callback(
+                    f"BOT - Reply to {target}: {sanitized_message}", bold=True
+                )
 
         except Exception as e:
             if self.log_callback:
                 self.log_callback(
                     f"BOT - Error sending message to {target}: {e}", bold=True
                 )
+
+    def contains_irc_commands(self, message):
+        irc_commands = [
+            "ADMIN",
+            "AWAY",
+            "BAN",
+            "CAP",
+            "CONNECT",
+            "DIE",
+            "ENCAP",
+            "ERROR",
+            "GLOBOPS",
+            "INFO",
+            "INVITE",
+            "ISON",
+            "JOIN",
+            "KICK",
+            "KILL",
+            "LINKS",
+            "LIST",
+            "LUSERS",
+            "MODE",
+            "MOTD",
+            "NAMES",
+            "NICK",
+            "NOTICE",
+            "OPER",
+            "PART",
+            "PASS",
+            "PING",
+            "PONG",
+            "PRIVMSG",
+            "QUIT",
+            "REHASH",
+            "RESTART",
+            "SERVICE",
+            "SERVLIST",
+            "SQUERY",
+            "SQUIT",
+            "STATS",
+            "SUMMON",
+            "TIME",
+            "TOPIC",
+            "TRACE",
+            "USER",
+            "USERHOST",
+            "USERS",
+            "VERSION",
+            "WALLOPS",
+            "WHO",
+            "WHOIS",
+            "WHOWAS",
+            "IGNORE",
+        ]
+
+        for command in irc_commands:
+            if message.upper().startswith(command):
+                return True
+        return False
+
+    def log_raw_messages(self, connection, event):
+        raw_message = " ".join(event.arguments).strip() if event.arguments else ""
+        normalized_message = raw_message.lstrip("-:").strip()
+        sanitized_message = self.sanitize_input(normalized_message)
+        message_signature = hashlib.sha256(sanitized_message.encode()).hexdigest()
+
+        if message_signature in self.logged_messages:
+            return
+
+        if any(
+            keyword.lower() in sanitized_message.lower()
+            for keyword in self.exclude_keywords
+        ):
+            return
+
+        self.logged_messages.add(message_signature)
+        if self.log_callback:
+            self.log_callback(f"IRC - {sanitized_message}")
 
 
 def ask_gpt4(
@@ -297,8 +376,8 @@ who wants to share thoughts like a human being. It's crucial that you always res
 
     conversation_history.append({"role": "user", "content": query})
 
-    # Limit the history to the last 20 messages, ensuring the system prompt is preserved
-    if len(conversation_history) > 20:
+    # Limit history to 10 messages and ensure the system prompt is preserved
+    if len(conversation_history) > 10:
         conversation_history = [conversation_history[0]] + conversation_history[-19:]
 
     data = {"messages": conversation_history}
@@ -307,7 +386,7 @@ who wants to share thoughts like a human being. It's crucial that you always res
         "Content-Type": "application/json",
     }
 
-    # Send request to LLM
+    # Send request to local LLM
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
         result = response.json()
