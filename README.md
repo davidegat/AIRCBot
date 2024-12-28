@@ -177,10 +177,10 @@ AIRCBot is open-source software. See the LICENSE file for details.
 ## Acknowledgments
 
 - Built using Python and Tkinter.
-- AI responses powered by LMStudio.
-- Powered by Linux and Coffee.
-- Inspired by cats. I love cats.
-
+- AI responses by LMStudio.
+- Powered by Linux and coffee.
+- Cats. I love cats. And coffee.
+- @lastknight (https://github.com/lastknight) who indirectly inspired it during a Christmas Night live of "Ciao Internet" :)
 ---
 
 For questions, contributions, or feature requests, feel free to contact the project maintainer or open an issue in the repository. Software is provided as-is, by using it you accept to take all responsibility for any damage of any kind this software may cause to your data, device(s), firm, corporation, shop, family, friends, whole life, belongings, backyard, dignity and other moral and psycological stuff, your body or your cats'.
