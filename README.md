@@ -15,17 +15,17 @@ You can easily modify this software to use external APIs, if needed (instruction
 - Maintains a conversation history to provide contextually aware responses.
 - Features a personal conversation history for each user.
 - Supports automatic chat to queries.
-- Limited interaction with channel (if asked by user via UI, or if OP status is given).
+- Limited interaction with channel (if asked by user via UI, or if OP/VOICE status is given).
 
 ### AI-Powered Conversations
-- Uses a locally hosted language model (via LMStudio API - download: https://lmstudio.ai/) to respond to messages.
-- Can be adapted to use remote API (like OpenAI).
+- Uses a locally hosted language model (via LMStudio API - download: https://lmstudio.ai/) to generate replies.
+- Can be adapted to use remote API (like OpenAI - see comments in code for instructions).
 - Natural, context-aware language generation prompt, adapted for IRC interactions.
 - Fetches and references the latest news for conversations about current events.
 
 ### Graphical Interface
-- Provides a Tkinter-based GUI for managing the bot.
-- Features connection setup, message sending, and console logging.
+- Provides a Tkinter-based GUI for managing the bot and monitor its activity.
+- Features connection setup, message and command sending, console logging.
 - Includes help menu for user guidance.
 
 ![image](https://github.com/user-attachments/assets/384b1112-b769-4e05-92d0-8d642bfd3d80)
@@ -34,9 +34,9 @@ You can easily modify this software to use external APIs, if needed (instruction
 ### Security
 - Requires password-based authentication for private messaging.
 - Implements basic anti-brute-force measures with temporary blocking for failed login attempts.
-- Uses a local LLM by default to increase privacy. 
-- Secure connection support.
-- Sanitized to avoid LLM to send raw commands to The IRC server if prompted to do so.
+- Uses a local LLM setup by default to increase privacy. 
+- Secure connection is supported by python irc libraries.
+- Inputs/Outputs sanitized to avoid LLM to generate and send raw commands if prompted to do so.
 - Implements ignore system for users tricking LLM into generating raw commands (ignore list resets when program restarts).
 
 ![image](https://github.com/user-attachments/assets/f21ea601-8cc8-4a9f-8d90-7084c0271f87)
@@ -50,10 +50,10 @@ You can easily modify this software to use external APIs, if needed (instruction
 - Internet connection for IRC and RSS feed integration.
 - LMStudio (https://lmstudio.ai/) or equivalent local language model API.
 - Bot is configured to use LMStudio API at `http://localhost:1234/v1/chat/completions` endpoint.
-- If you can't run a local LLM model, follow instruction in the code comments to use your own external endpoint (like OpenAI API - Please refer to OpenAI documentation for API access).
+- If you can't run a local LLM model, follow instruction in the code comments to use your own external endpoint (like OpenAI API - Please refer to OpenAI documentation for API access). Less privacy is to be expected in this case.
 
 ### Python Libraries
-Ensure the following libraries are installed and available:
+Ensure the following libraries are installed and/or available:
 - `tkinter`
 - `requests`
 - `feedparser`
@@ -63,7 +63,7 @@ Ensure the following libraries are installed and available:
 - `hashlib`
 - `irc` (irc.client)
 
-If you plan to change the code, consider also `openai`. Please refer to OpenAI documentation for API access.
+If you plan to change the code to use external APIs, consider importing `openai`. Please refer to OpenAI documentation for API access, and code comments for instructions.
 
 Install missing dependencies using (example):
 ```bash
@@ -87,14 +87,14 @@ pip install requests feedparser
    python aircbot.py
    ```
 3. **LLM (LMStudio)**
-   Make sure your local LLM is up and running before connecting to IRC server.
+   Make sure your local LLM is up and running before connecting to IRC server, or you will only get a zombie bot parked on a channel.
    
 ---
 
 ## Configuration
 
 ### Connection Parameters
-In the GUI, fill in the following fields:
+In the graphic interface, fill in the following fields:
 - **Server:** IRC server address (e.g., `open.ircnet.net`).
 - **Port:** IRC server port (default: `6667`).
 - **Nickname:** bot's IRC nickname (e.g., `Egidio`).
@@ -107,45 +107,47 @@ In the GUI, fill in the following fields:
 
 Make sure your local LLM is up and running, then:
 
-1. **Start the Bot:**
-   Launch the bot by running the script and clicking the "Connect" button in the GUI.
+1. **Connect the Bot:**
+   Click the "Connect" button in the GUI.
 
 2. **Join a Channel:**
-   After connecting, click "Join Channel" to enter the specified IRC channel.
+   "Auto-Join" checkbox will ensure the bot will join channel upon connection, uncheck to get control over it.
+   After connecting, click "Join Channel" to enter the specified IRC channel if Auto-Join is disabled.
 
-3. **Send Messages:**
-   - Use the message input field to send messages to the channel.
-   - Use the command input field to send raw IRC commands (e.g., `/who`, `/mode`).
+4. **Send Messages:**
+   - Use the message input field to send messages to default channel.
+   - Use command input field to send IRC commands (e.g., `/who`, `/mode`).
 
-4. **Private Messaging:**
+5. **Private Messaging:**
    - Users can send direct messages to the bot.
    - The bot will request authentication if the user is not pre-authorized.
+   - Once authenticated, user can interact with bot's AI brain and get responses.
 
-5. **News Integration:**
-   - The bot fetches the latest news headlines and includes them in responses when relevant.
+6. **News Integration:**
+   - The bot fetches latest news headlines and includes them in responses when and if relevant.
 
-6. **Notes on LMStudio**
+7. **Notes on LMStudio**
    - Tested with: Temp 0.55-0.65 / Response Lenght 100-150 / Context 2000tk
    - Similar results with different LLMs
    - Download https://lmstudio.ai/
 
 ---
 
-## Other Security Notes
+## Other Security Notes or issues
 
 - Multiple messages sent to the bot are queued. This must be handled in the future, to avoid overloads.
 - Do not leave your bot unattended, or in background, to avoid abuse by users or breaking server ToS.
 - Removing password protection from code seems not a good idea, but you decide.
-- Conversation history is different from each user.
-- Only one password is allowed to be set, choose a **new one** before sharing it to other users. Do not reuse your own passwords.
+- Conversation history is different from each user, anyways, do not discolse personal informations if using external APIs like OpenAI.
+- Bot is not multiuser in a true sense. Only one password is allowed to be set, choose a **new one** before sharing it to other users. Do not reuse your own passwords.
   
 ---
 
 ## Other Limitations
 
-Some features are not supported to avoid complexity, and for security reasons:
+Some features are not supported to avoid complexity, or for security reasons:
 - Supports only one channel at a time, to avoid excessive exposure.
-- Does not handle CTCP (Client-To-Client Protocol) or DCC (Direct Client-to-Client) connections.
+- Does not handle full CTCP (Client-To-Client Protocol) and does not handle DCC (Direct Client-to-Client) connections  at all.
 - Requires local hosting of the LMStudio model to increase privacy, but can be modified to use an external API (see examples in code comments).
 
 ---
@@ -153,18 +155,24 @@ Some features are not supported to avoid complexity, and for security reasons:
 ## Troubleshooting
 
 1. **Connection Issues:**
-   - Ensure the server and port are correct.
+   - Ensure server and port are correct.
    - Check your internet connection.
+   - Check your firewall and/or vpn
 
 2. **Authentication Fails:**
-   - Verify the correct password is entered.
+   - Verify correct password is entered.
    - Wait if temporarily blocked.
+   - Hope if ignored for the session...
 
 3. **AI Response Errors:**
-   - Ensure LMStudio is running and accessible at `http://localhost:1234/v1/chat/completions`.
-   - Check the API response in the logs for troubleshooting.
+   - Ensure LMStudio is running and accessible at `http://localhost:1234/v1/chat/completions`. A warning should be issued in the bot console if local API is unreachable.
    - If you modified the code to support external API, check if your endpoint and parameters are correct for your model.
    - If you modified the system prompt, try adapting it to get better answers.
+
+4. **Strange(r) Things
+   - Results depend upon which model you are usings, and relative settings.
+   - Try using different models and settings for best results.
+   - Keep values low: short response, short context, not too much temperature.
 
 ---
 
