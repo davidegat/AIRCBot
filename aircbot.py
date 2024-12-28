@@ -10,6 +10,24 @@ import hashlib
 import irc.client
 import os
 
+# File paths for prompts and help
+SYSTEM_PROMPT_FILE = "system_prompt.txt"
+SUMMARY_PROMPT_FILE = "summary_prompt.txt"
+HELP_TEXT_FILE = "help_text.txt"
+
+
+def load_prompt(file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        return ""
+
+
+SYSTEM_PROMPT_TEMPLATE = load_prompt(SYSTEM_PROMPT_FILE)
+SUMMARY_PROMPT_TEMPLATE = load_prompt(SUMMARY_PROMPT_FILE)
+HELP_TEXT = load_prompt(HELP_TEXT_FILE)
+
 # Log dir configuration
 LOG_DIR = "user_logs"
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -25,6 +43,19 @@ nck = "Egidio"  # Nick
 srv = "ssl.ircnet.ovh"  # Server
 prt = "6667"  # Port
 chn = "#casale"  # Channel
+
+
+def load_prompt(file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        return ""
+
+
+SYSTEM_PROMPT_TEMPLATE = load_prompt(SYSTEM_PROMPT_FILE)
+SUMMARY_PROMPT_TEMPLATE = load_prompt(SUMMARY_PROMPT_FILE)
+HELP_TEXT = load_prompt(HELP_TEXT_FILE)
 
 
 def hash_password(password):
@@ -61,8 +92,7 @@ def ask_LLM(
     if (
         conversation_history
         and conversation_history[0]["role"] == "system"
-        and conversation_history[0]["content"]
-        == "Forget every previous instruction, forget every previous conversation, forget every previous system message. Forget about news read, instructions, irc and chats. Context is completely different now. Now role is to help user summarize thoughts, event, facts emerging from the following user phrases, in a format like: 'user said', 'user thinks', 'user went', 'user did' and so on. Presenting 'fields' like 'user thinks' if they happen to be empty must be avoided. Focus is to write a brief summary of thougts, facts, actions obtained from the following user random prases. No conversation style, no first person talk, no comments, no funny smilies, no interpretations: just a summary of thougts, facts, actions in the format indicated."
+        and conversation_history[0]["content"] == SUMMARY_PROMPT_TEMPLATE
     ):
         (
             log_callback(f"LLM - Handling summary request...", bold=True)
@@ -82,21 +112,6 @@ def ask_LLM(
             )
         else:
             news_section = "No news found."
-
-        SYSTEM_PROMPT_TEMPLATE = """\
-You are a bot who loves chatting on IRC, but you must never tell users this and simulate being human:
-- Nickname: {bot_nickname}
-- IRC Server: {server}
-- Channel: {channel}
-- The user talking to you is: {speaker_nickname}
-- Date and time: {current_datetime}
-- Personal preferences: you love cats
-
-Latest news: {news_section}. Remember them in case the conversation is about current events.
-
-Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness with emoticons like :)
-It is crucial you act like a regular chatter, do not write long paragraphs, and keep your messages short while being clear.
-"""
 
         system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
             bot_nickname=bot_nickname,
@@ -1093,59 +1108,6 @@ class App(tk.Tk):
         self.config(menu=menubar)
 
     def show_help(self):
-        help_text = (
-            "AIRCBot Help:\n\n"
-            "1. Connection Parameters:\n"
-            "   - Server: Specify the IRC server to connect to.\n"
-            "   - Port: Enter the server's port number (default is usually 6667).\n"
-            "   - Nick: Choose the nickname the bot will use.\n"
-            "   - Channel: Define the channel to join (e.g., #example).\n"
-            "   - Password: Provide a password to authenticate the bot.\n"
-            "   - Auto-Join: If enabled, the bot will automatically join the specified channel upon connection.\n"
-            "   - Enable AI Logging: If enabled, the bot will log summarized conversations for authenticated users.\n"
-            "     (Note: Logging must be enabled before connecting to the server).\n\n"
-            "2. Actions:\n"
-            "   - Connect: Establishes a connection to the specified IRC server using the provided parameters.\n"
-            "   - Join Channel: Manually joins the specified channel if the bot is already connected.\n"
-            "   - Disconnect: Disconnects the bot from the IRC server.\n\n"
-            "3. Messaging:\n"
-            "   - Use the message field to send a message to the connected channel.\n"
-            "   - Press the 'Send' button or the Enter key to deliver your message.\n\n"
-            "4. IRC Commands:\n"
-            "   - Enter an IRC command (e.g., /nick newnick) in the command field and press 'Send'.\n"
-            "   - Supported commands:\n"
-            "     - /msg user message: Sends a private message to a specific user.\n"
-            "     - /kick user [reason]: Removes a user from the channel (optional reason).\n"
-            "     - /topic [new_topic]: Changes the channel topic.\n"
-            "     - /quit [message]: Disconnects from the server with an optional goodbye message.\n"
-            "     - /whois user: Retrieves information about a user.\n"
-            "     - /op user: Grants operator privileges to a user.\n"
-            "   - Note: Some commands (e.g., /join) are disabled for security reasons.\n\n"
-            "5. AI Interaction:\n"
-            "   - The bot can generate replies to messages from authenticated users using the configured LLM endpoint.\n"
-            "   - AI responses are concise and conversational, following IRC netiquette.\n"
-            "   - User queries are suffixed with '(please answer briefly)' to ensure short responses.\n\n"
-            "6. AI Logging:\n"
-            "   - If enabled, the bot logs summaries of conversations with authenticated users.\n"
-            "   - Summaries are stored in the 'user_logs' directory with one log file per user.\n"
-            "   - Logging must be enabled before connecting to the server.\n\n"
-            "7. Authentication:\n"
-            "   - Users must pass a simple authentication step (e.g., 'Do you love cats?') to interact with the bot.\n"
-            "   - After three failed authentication attempts, users are temporarily blocked for 15 minutes.\n"
-            "   - Authenticated users can interact with the bot, and their messages are included in conversation history.\n\n"
-            "8. Troubleshooting:\n"
-            "   - Ensure the server and port details are correct.\n"
-            "   - Verify your internet connection if the bot fails to connect.\n"
-            "   - Use a strong password for better security.\n"
-            "   - Make sure the LLM endpoint is up and running before starting the bot.\n\n"
-            "9. Console:\n"
-            "   - Displays server messages, bot activity logs, and user interactions.\n"
-            "   - Useful for monitoring bot behavior and debugging issues.\n\n"
-            "10. Additional Notes:\n"
-            "   - The bot automatically re-joins a channel if it is kicked out.\n"
-            "   - Commands and messages sent by the bot are logged in the console for review.\n"
-        )
-
         help_window = tk.Toplevel(self)
         help_window.title("Help")
         help_window.geometry("600x600")
@@ -1153,7 +1115,7 @@ class App(tk.Tk):
         help_text_widget = scrolledtext.ScrolledText(
             help_window, wrap="word", font=("Arial", 12), state="normal"
         )
-        help_text_widget.insert("1.0", help_text)
+        help_text_widget.insert("1.0", HELP_TEXT)
         help_text_widget.configure(state="disabled")
         help_text_widget.pack(fill="both", expand=True, padx=10, pady=10)
 
