@@ -74,7 +74,8 @@ class IRCBot:
         ]
         self.conversation_history = []
         self.ignore_list = set()
-        
+        self.user_conversations = {}
+       
     def connect(self):
         if self.log_callback:
             self.log_callback(
@@ -161,14 +162,13 @@ class IRCBot:
                 self.send_message(self.channel, f"Thanks for Voice {source}! :*")
 
     def on_private_message(self, connection, event):
-        source = event.source.nick
-        message = event.arguments[0]
+        source = event.source.nick  # Mittente del messaggio
+        message = event.arguments[0]  # Contenuto del messaggio
 
         if source in self.ignore_list:
             if self.log_callback:
                 self.log_callback(
-                    f"BOT - Message from ignored user {source}. Not replying.",
-                    bold=True,
+                    f"BOT - Message from ignored user {source}. Not replying.", bold=True
                 )
             return
 
@@ -178,15 +178,20 @@ class IRCBot:
             )
             self.log_callback(f"IRC - From {source}: {message}", bold=True)
 
+        # Controlla se l'utente è autenticato
         if source not in self.authenticated_users:
             self.request_authentication(source)
         elif self.authenticated_users.get(source, False):
-            self.log_callback(
-                f"BOT - AI is generating a reply for {source}...", bold=True
-            )
+            # Gestione della cronologia specifica per l'utente
+            if source not in self.user_conversations:
+                self.user_conversations[source] = [{"role": "system", "content": ""}]
+
+            self.log_callback(f"BOT - AI is generating a reply for {source}...", bold=True)
+
+            # Passa la cronologia dell'utente specifico al modello
             response, role = ask_LLM(
                 query=message,
-                conversation_history=self.conversation_history,
+                conversation_history=self.user_conversations[source],
                 bot_nickname=self.nickname,
                 server=self.server,
                 channel=self.channel,
@@ -194,9 +199,15 @@ class IRCBot:
                 log_callback=self.log_callback,
             )
 
+            # Aggiorna la cronologia per l'utente
+            self.user_conversations[source].append({"role": "user", "content": message})
+            self.user_conversations[source].append({"role": "assistant", "content": response})
+
+            # Invia la risposta al mittente
             self.send_message(source, response)
         else:
             self.check_password(source, message)
+
 
 
     def sanitize_input(self, text):
@@ -424,9 +435,6 @@ You are a bot who loves chatting on IRC, but you must never tell users this and 
 Latest news: {news_section}. Remember them in case the conversation is about current events.
 
 Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness with emoticons like :)
-Be friendly and sociable with everyone, but always be concise.
-Don't introduce yourself as an assistant, but as a curious person who suggests conversation topics,
-who wants to share thoughts like a human being. It's crucial that you always respond in the language questions are made with, without errors and just one line plain text without formatting it with enter characters, paragraphs and so on.
 """
 
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
@@ -438,6 +446,7 @@ who wants to share thoughts like a human being. It's crucial that you always res
         news_section=news_section,
     )
 
+    # Aggiorna o inizializza il messaggio di sistema
     system_idx = next(
         (i for i, m in enumerate(conversation_history) if m["role"] == "system"), None
     )
@@ -446,10 +455,11 @@ who wants to share thoughts like a human being. It's crucial that you always res
     else:
         conversation_history.insert(0, {"role": "system", "content": system_prompt})
 
+    # Aggiungi il messaggio dell'utente alla cronologia
     conversation_history.append({"role": "user", "content": query})
 
-    # Limit history to 10 messages and ensure the system prompt is preserved
-    if len(conversation_history) > 10:
+    # Limita la cronologia a un massimo di 20 messaggi
+    if len(conversation_history) > 20:
         conversation_history = [conversation_history[0]] + conversation_history[-19:]
 
     data = {"messages": conversation_history}
@@ -500,7 +510,7 @@ who wants to share thoughts like a human being. It's crucial that you always res
     #    openai.api_key = os.getenv("OPENAI_API_KEY")
     # 
     #
-    # Note: The OpenAI API requires an active subscription or billing setup. Be mindful of usage costs.
+    # Note: The OpenAI API requires an active subscription or billing setup. Less privacy is expected too.
 
     try:
         # Send request to local LLM
