@@ -49,7 +49,7 @@ You can easily modify this software to use external APIs if needed (instructions
 - Python 3.9 or later.
 - Internet connection for IRC and RSS feed integration.
 - LMStudio (https://lmstudio.ai/) or equivalent local language model API.
-- Bot is configured to use LMStudio API at `http://localhost:1234/v1/chat/completions` endpoint. If you want to use a different endpoint, just customize the LLM_ENDPOINT variable on top of the code.
+- Bot is configured to use LMStudio API at `http://localhost:1234/v1/chat/completions` endpoint. 
 - If you can't run a local LLM model, follow instruction in the code comments to use your own external endpoint (like OpenAI API - Please refer to OpenAI documentation for API access). Less privacy is to be expected in this case.
 
 ### Python Libraries
@@ -166,6 +166,7 @@ Some features are not supported to avoid complexity, or for security reasons:
 
 3. **AI Response Errors:**
    - Ensure LMStudio is running and accessible at `http://localhost:1234/v1/chat/completions`. A warning should be issued in the bot console if local API is unreachable.
+      - NOTE: To use a different endpoint for local LLMs, just customize the LLM_ENDPOINT variable on top of the code.
    - If you modified the code to support external API, check if your endpoint and parameters are correct for your model.
    - If you modified the system prompt, try adapting it to get better answers.
 
