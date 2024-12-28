@@ -1026,27 +1026,32 @@ class App(tk.Tk):
         help_text = (
             "AIRCBot Help:\n\n"
             "1. Connection Parameters:\n"
-            "   - Server: The IRC server to connect to.\n"
-            "   - Port: The port number for the IRC server (default is usually 6667).\n"
-            "   - Nick: Your desired nickname.\n"
-            "   - Channel: The channel to join (e.g., #example).\n"
-            "   - Password: Your bot password for authentication.\n\n"
+            "   - Server: Specify the IRC server to connect to.\n"
+            "   - Port: Enter the server's port number (default is usually 6667).\n"
+            "   - Nick: Choose the nickname the bot will use.\n"
+            "   - Channel: Define the channel to join (e.g., #example).\n"
+            "   - Password: Provide a password to authenticate the bot.\n"
+            "   - Auto-Join: If enabled, the bot will automatically join the specified channel upon connection.\n\n"
             "2. Actions:\n"
-            "   - Connect: Establish a connection to the IRC server.\n"
-            "   - Join Channel: Join the specified channel.\n"
-            "   - Disconnect: Disconnect from the server.\n\n"
+            "   - Connect: Establishes a connection to the specified IRC server using the provided parameters.\n"
+            "   - Join Channel: Manually joins the specified channel if the bot is already connected.\n"
+            "   - Disconnect: Disconnects the bot from the IRC server.\n\n"
             "3. Messaging:\n"
-            "   - Use the text field to send a message to the channel.\n"
-            "   - Press 'Send' to deliver your message.\n\n"
+            "   - Use the text field to send a message to the connected channel.\n"
+            "   - Press the 'Send' button or the Enter key to deliver your message.\n\n"
             "4. IRC Commands:\n"
-            "   - Enter an IRC command (e.g., /nick newnick) and press 'Send'.\n"
-            "   - Note: /join commands are disabled for security reasons.\n\n"
+            "   - Enter an IRC command (e.g., /nick newnick) in the command field and press 'Send'.\n"
+            "   - Note: Some commands, such as /join, are disabled for security reasons.\n\n"
             "5. Console:\n"
-            "   - The console displays messages and server events.\n\n"
+            "   - Displays server messages, bot activity logs, and user interactions.\n"
+            "   - Useful for monitoring bot behavior and debugging issues.\n\n"
             "6. Troubleshooting:\n"
-            "   - Ensure the server and port are correct.\n"
-            "   - Check your internet connection if you encounter issues.\n"
-            "   - Use a strong password for bot authentication.\n"
+            "   - Ensure the server and port details are correct.\n"
+            "   - Verify your internet connection if the bot fails to connect.\n"
+            "   - Use a strong password for better security.\n\n"
+            "7. Additional Notes:\n"
+            "   - The bot will automatically rejoin a channel if it is kicked out.\n"
+            "   - Commands and messages sent by the bot are logged in the console for review.\n"
         )
 
         help_window = tk.Toplevel(self)
@@ -1059,6 +1064,7 @@ class App(tk.Tk):
         help_text_widget.insert("1.0", help_text)
         help_text_widget.configure(state="disabled")
         help_text_widget.pack(fill="both", expand=True, padx=10, pady=10)
+
 
 
 if __name__ == "__main__":
