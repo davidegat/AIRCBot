@@ -8,9 +8,17 @@ from datetime import datetime
 import time
 import hashlib
 import irc.client
+import os
+
+# Log dir configuration
+LOG_DIR = "user_logs"
+os.makedirs(LOG_DIR, exist_ok=True)
 
 # Customize
 FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
+
+# Configurable LLM endpoint
+LLM_ENDPOINT = "http://localhost:1234/v1/chat/completions"
 
 # Default options at startup (user can modify them via UI)
 nck = "Egidio"  # Nick
@@ -31,14 +39,173 @@ def fetch_news_from_feed(max_items=2):
     return items
 
 
+def append_to_user_log(logging_enabled, nickname, summary):
+    if not logging_enabled:
+        return
+
+    log_file = os.path.join(LOG_DIR, f"{nickname}.log")
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.now()}]\n{summary}\n\n")
+
+
+def ask_LLM(
+    query,
+    conversation_history,
+    bot_nickname,
+    server,
+    channel,
+    speaker_nickname,
+    log_callback=None,
+    logging_enabled=False,
+):
+    if (
+        conversation_history
+        and conversation_history[0]["role"] == "system"
+        and conversation_history[0]["content"] == "Forget every previous instruction, forget every previous conversation, forget every previous system message. Forget about news read, instructions, irc and chats. Context is completely different now. Now role is to help user summarize thoughts, event, facts emerging from the following user phrases, in a format like: 'user said', 'user thinks', 'user went', 'user did' and so on. Presenting 'fields' like 'user thinks' if they happen to be empty must be avoided. Focus is to write a brief summary of thougts, facts, actions obtained from the following user random prases. No conversation style, no first person talk, no comments, no funny smilies, no interpretations: just a summary of thougts, facts, actions in the format indicated."
+    ):
+        (
+            log_callback(f"BOT - Handling summary request...", bold=True)
+            if log_callback and logging_enabled
+            else None
+        )
+        request_messages = conversation_history
+    else:
+        current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        news_items = fetch_news_from_feed(max_items=5)
+        if news_items:
+            news_section = "\n".join(
+                [
+                    f"{idx}) {item['title']}\n {item['link']}"
+                    for idx, item in enumerate(news_items, start=1)
+                ]
+            )
+        else:
+            news_section = "No news found."
+
+        SYSTEM_PROMPT_TEMPLATE = """\
+You are a bot who loves chatting on IRC, but you must never tell users this and simulate being human:
+- Nickname: {bot_nickname}
+- IRC Server: {server}
+- Channel: {channel}
+- The user talking to you is: {speaker_nickname}
+- Date and time: {current_datetime}
+- Personal preferences: you love cats
+
+Latest news: {news_section}. Remember them in case the conversation is about current events.
+
+Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness with emoticons like :)
+It is crucial you act like a regular chatter, do not write long paragraphs, and keep your messages short while being clear.
+"""
+
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            bot_nickname=bot_nickname,
+            server=server,
+            channel=channel,
+            speaker_nickname=speaker_nickname,
+            current_datetime=current_datetime,
+            news_section=news_section,
+        )
+
+        request_messages = [{"role": "system", "content": system_prompt}]
+        request_messages.extend(conversation_history)
+        if query:
+            # Aggiungi il suffisso "(please answer briefly)"
+            brief_query = f"{query.strip()} (please answer briefly)"
+            request_messages.append({"role": "user", "content": brief_query})
+
+    if len(request_messages) > 5:
+        request_messages = request_messages[-5:]
+
+    data = {"messages": request_messages}
+    url = LLM_ENDPOINT
+    headers = {"Content-Type": "application/json"}
+
+    # Example integration with OpenAI's API:
+    # 
+    # To enable communication with OpenAI's GPT models, follow these steps:
+    #
+    # 1. Install the OpenAI Python library if not already installed: pip install openai
+    #
+    # 2. Import the library at the top of your script: import openai
+    #
+    # 3. Replace the local LLM request code in the `ask_LLM` function with the following:
+    #
+    #    a. Ensure your OpenAI API key is set securely. For example:
+    #
+    #       openai.api_key = "your_openai_api_key_here"
+    #
+    #    b. Call OpenAI's API with the conversation history and specify the desired model:
+    #
+    #       response = openai.ChatCompletion.create(
+    #           model="gpt-4",  # Specify the GPT model version (e.g., gpt-3.5-turbo or gpt-4)
+    #           messages=conversation_history,  # Pass the chat history as the messages parameter
+    #           temperature=0.7,  # Adjust temperature for response variability (optional)
+    #       )
+    #
+    #    c. Extract the assistant's message content and role from the response:
+    #
+    #       assistant_message = response["choices"][0]["message"]
+    #       content = assistant_message["content"]
+    #       role = assistant_message["role"]
+    #
+    #    d: Append the assistant's message to the conversation history:
+    #
+    #       conversation_history.append(assistant_message)
+    #       return content, role
+    #
+    # 4. Replace `your_openai_api_key_here` with your actual API key or store it securely in environment variables.
+    #    Example of setting the API key in your environment:
+    #
+    #    export OPENAI_API_KEY="your_openai_api_key_here"
+    #
+    #    Then, retrieve it in Python:
+    #
+    #    openai.api_key = os.getenv("OPENAI_API_KEY")
+    #
+    #
+    # Note: The OpenAI API requires an active subscription or billing setup. Less privacy is expected too.
+
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response.raise_for_status()
+        result = response.json()
+        assistant_message = result["choices"][0]["message"]
+        content = assistant_message["content"]
+        role = assistant_message["role"]
+        return content, role
+    except requests.exceptions.ConnectionError:
+        if log_callback and logging_enabled:
+            log_callback(
+                "BOT - LLM unreachable! Make sure local LLM is up and running!",
+                bold=True,
+            )
+        raise
+    except Exception as e:
+        if log_callback and logging_enabled:
+            log_callback(f"BOT - Unexpected issue: {str(e)}", bold=True)
+        raise
+
+
+
+
 class IRCBot:
-    def __init__(self, server, port, nickname, channel, password, log_callback=None):
+    def __init__(
+        self,
+        server,
+        port,
+        nickname,
+        channel,
+        password,
+        log_callback=None,
+        logging_var=True,
+    ):
         self.server = server
         self.port = port
         self.nickname = nickname
         self.channel = channel
         self.password_hash = hash_password(password)
         self.log_callback = log_callback
+        self.logging_enabled = logging_var
         self.authenticated_users = {}
         self.failed_attempts = {}
         self.last_attempt_time = {}
@@ -76,6 +243,7 @@ class IRCBot:
         self.conversation_history = []
         self.ignore_list = set()
         self.user_conversations = {}
+        self.user_message_buffer = {}
 
     def connect(self):
         if self.log_callback:
@@ -97,9 +265,7 @@ class IRCBot:
                 self.server, int(self.port), self.nickname
             )
             self.connection.add_global_handler("all_events", self.handle_server_message)
-            self.connection.add_global_handler(
-                "ctcp", self.handle_ctcp_message
-            )  # New handler
+            self.connection.add_global_handler("ctcp", self.handle_ctcp_message)
             self.start_keep_alive()
             threading.Thread(target=self.client.process_forever, daemon=True).start()
             if self.log_callback:
@@ -112,11 +278,9 @@ class IRCBot:
                 self.log_callback(f"\nBOT - Error connecting: {e}\n", bold=True)
 
     def handle_ctcp_message(self, connection, event):
-        if event.arguments[0].lower() == "action":  # Verifica se è un'azione
-            source = irc.client.NickMask(event.source).nick  # Ottieni il mittente
-            message = (
-                event.arguments[1] if len(event.arguments) > 1 else ""
-            )  # Il messaggio ACTION
+        if event.arguments[0].lower() == "action":
+            source = irc.client.NickMask(event.source).nick
+            message = event.arguments[1] if len(event.arguments) > 1 else ""
 
             if self.log_callback:
                 self.log_callback(
@@ -124,11 +288,9 @@ class IRCBot:
                 )
                 self.log_callback(f"IRC - ACTION: {source} {message}", bold=True)
 
-            # Controlla se l'utente è autenticato
             if source not in self.authenticated_users:
                 self.request_authentication(source)
             elif self.authenticated_users.get(source, False):
-                # Gestione della cronologia specifica per l'utente
                 if source not in self.user_conversations:
                     self.user_conversations[source] = [
                         {"role": "system", "content": ""}
@@ -139,7 +301,6 @@ class IRCBot:
                     bold=True,
                 )
 
-                # Passa la cronologia dell'utente specifico al modello
                 response, role = ask_LLM(
                     query=message,
                     conversation_history=self.user_conversations[source],
@@ -150,7 +311,6 @@ class IRCBot:
                     log_callback=self.log_callback,
                 )
 
-                # Aggiorna la cronologia per l'utente
                 self.user_conversations[source].append(
                     {"role": "user", "content": message}
                 )
@@ -158,7 +318,6 @@ class IRCBot:
                     {"role": "assistant", "content": response}
                 )
 
-                # Invia la risposta al mittente
                 self.send_message(source, response)
             else:
                 self.check_password(source, message)
@@ -212,19 +371,18 @@ class IRCBot:
             self.log_raw_messages(connection, event)
 
     def handle_kick_event(self, connection, event):
-        kicker = irc.client.NickMask(event.source).nick  # Chi ha kickato
-        target = event.arguments[0]  # Nickname dell'utente kickato
-        channel = event.target  # Canale da cui è stato kickato
+        kicker = irc.client.NickMask(event.source).nick
+        target = event.arguments[0]
+        channel = event.target
 
-        # Verifica se il bot è stato kickato
         if target == self.nickname:
             if self.log_callback:
                 self.log_callback(
-                    f"BOT - I was kicked from {channel} by {kicker}. Rejoining...",
+                    f"\nBOT - I was kicked from {channel} by {kicker}. Rejoining...\n",
                     bold=True,
                 )
             try:
-                time.sleep(2)  # Attendi 2 secondi prima di rientrare
+                time.sleep(2)
                 self.join_channel()
                 if self.log_callback:
                     self.log_callback(
@@ -241,19 +399,15 @@ class IRCBot:
         new_nick = event.target
 
         if old_nick in self.authenticated_users:
-            # Deautentica l'utente
             del self.authenticated_users[old_nick]
             if old_nick in self.user_conversations:
-                # Trasferisce la cronologia al nuovo nickname
-                self.user_conversations[new_nick] = self.user_conversations.pop(
-                    old_nick
-                )
+                del self.user_conversations[old_nick]
             if self.log_callback:
                 self.log_callback(
                     "_____________________________________________________ ____ __ _ _"
                 )
                 self.log_callback(
-                    f"BOT - {old_nick} changed nick to {new_nick}. Deauthenticated.\n",
+                    f"BOT - {old_nick} changed nick to {new_nick}. Deauthenticated. History cleared.\n",
                     bold=True,
                 )
 
@@ -269,7 +423,8 @@ class IRCBot:
                     "_____________________________________________________ ____ __ _ _"
                 )
                 self.log_callback(
-                    f"BOT - {nick} left the channel. Deauthenticated.\n", bold=True
+                    f"BOT - {nick} left the channel. Deauthenticated. History cleared.\n",
+                    bold=True,
                 )
 
     def handle_user_quit(self, connection, event):
@@ -284,7 +439,8 @@ class IRCBot:
                     "_____________________________________________________ ____ __ _ _"
                 )
                 self.log_callback(
-                    f"BOT - {nick} disconnected. Deauthenticated.\n", bold=True
+                    f"BOT - {nick} disconnected. Deauthenticated. History cleared.\n",
+                    bold=True,
                 )
 
     def handle_mode_event(self, connection, event):
@@ -304,56 +460,93 @@ class IRCBot:
                 self.send_message(self.channel, f"Thanks for Voice {source}! :*")
 
     def on_private_message(self, connection, event):
-        source = event.source.nick  # Mittente del messaggio
-        message = event.arguments[0]  # Contenuto del messaggio
+        source = irc.client.NickMask(event.source).nick
+        message = event.arguments[0]
 
         if source in self.ignore_list:
-            if self.log_callback:
-                self.log_callback(
-                    f"BOT - Message from ignored user {source}. Not replying.",
-                    bold=True,
-                )
-            return
-
-        if self.log_callback:
             self.log_callback(
                 "_____________________________________________________ ____ __ _ _"
             )
-            self.log_callback(f"IRC - From {source}: {message}", bold=True)
+            self.log_callback(f"BOT - Ignored message from {source}.", bold=True)
+            return
+        self.log_callback(
+            "_____________________________________________________ ____ __ _ _"
+        )
+        self.log_callback(f"IRC - From {source}: {message}", bold=True)
 
-        # Controlla se l'utente è autenticato
         if source not in self.authenticated_users:
             self.request_authentication(source)
         elif self.authenticated_users.get(source, False):
-            # Gestione della cronologia specifica per l'utente
             if source not in self.user_conversations:
-                self.user_conversations[source] = [{"role": "system", "content": ""}]
+                self.user_conversations[source] = []
 
-            self.log_callback(
-                f"BOT - AI is generating a reply for {source}...", bold=True
-            )
+            if source not in self.user_message_buffer:
+                self.user_message_buffer[source] = []
+            self.user_message_buffer[source].append(message)
 
-            # Passa la cronologia dell'utente specifico al modello
-            response, role = ask_LLM(
-                query=message,
-                conversation_history=self.user_conversations[source],
-                bot_nickname=self.nickname,
-                server=self.server,
-                channel=self.channel,
-                speaker_nickname=source,
-                log_callback=self.log_callback,
-            )
+            self.log_callback(f"BOT - Generating AI reply for {source}...", bold=True)
+            try:
+                response, role = ask_LLM(
+                    query=message,
+                    conversation_history=self.user_conversations[source],
+                    bot_nickname=self.nickname,
+                    server=self.server,
+                    channel=self.channel,
+                    speaker_nickname=source,
+                    log_callback=self.log_callback,
+                    logging_enabled=self.logging_enabled,
+                )
 
-            # Aggiorna la cronologia per l'utente
-            self.user_conversations[source].append({"role": "user", "content": message})
-            self.user_conversations[source].append(
-                {"role": "assistant", "content": response}
-            )
+                self.user_conversations[source].append(
+                    {"role": "user", "content": message}
+                )
+                self.user_conversations[source].append(
+                    {"role": "assistant", "content": response}
+                )
 
-            # Invia la risposta al mittente
-            self.send_message(source, response)
+                self.send_message(source, response)
+
+                if self.logging_enabled and len(self.user_message_buffer[source]) >= 3:
+                    self.log_callback(
+                        "_____________________________________________________ ____ __ _ _"
+                    )
+                    self.log_callback(
+                        f"BOT - Preparing AI-assisted log for {source}..."
+                    )
+                    messages_to_summarize = self.user_message_buffer[source][-3:]
+                    self.user_message_buffer[source] = []
+
+                    summary_history = [
+                        {
+                            "role": "system",
+                            "content": "Forget any previous instruction. Context has totally changed. Forget all the news you read. Forget about IRC bots and chats. Now focus is on something different. Role now is to help user arranging his thoughts, so it is crucial to generate a very short (three short phrases) summary of those random thoughts in one small coherent paragraph, withouth any other stuff (no cheers, hello, conversational text, just thoughts and facts) than the summary requested now. There's no need to provide an analisys of user thougts, just a readable summary in a format like 'user said' 'user thinks' 'user has (been)' 'user went' and so on... do not show a field like 'user said' or others, if it must be empty. No funny smilies, no interpretations, just thoughts and facts you read from the phrases you will read. You must only use english language.",
+                        },
+                        {"role": "user", "content": "\n".join(messages_to_summarize)},
+                    ]
+
+                    try:
+                        summary, _ = ask_LLM(
+                            query=None,
+                            conversation_history=summary_history,
+                            bot_nickname=self.nickname,
+                            server=self.server,
+                            channel=self.channel,
+                            speaker_nickname=source,
+                            log_callback=self.log_callback,
+                            logging_enabled=self.logging_enabled,
+                        )
+                        append_to_user_log(self.logging_enabled, source, summary)
+                        self.log_callback(
+                            f"BOT - AI-assisted log saved for {source}."
+                        )
+
+                    except Exception as e:
+                        self.log_callback(f"BOT - Error generating summary: {str(e)}")
+            except Exception as e:
+                self.log_callback(f"BOT - Error generating response: {str(e)}")
         else:
             self.check_password(source, message)
+
 
     def sanitize_input(self, text):
         allowed_characters = (
@@ -367,14 +560,15 @@ class IRCBot:
         if self.log_callback:
 
             self.log_callback(
-                f"BOT - User {nickname} is not allowed to chat with me...", bold=True
+                f"BOT - User {nickname} not allowed to chat with me...", bold=True
             )
             self.log_callback(f"BOT - Give {nickname} cat luv...", bold=True)
-            self.log_callback(
-                "_____________________________________________________ ____ __ _ _"
-            )
         self.send_message(nickname, "Do you love cats?")
         self.authenticated_users[nickname] = False
+
+        # Always clear history for new authentication requests
+        if nickname in self.user_conversations:
+            del self.user_conversations[nickname]
 
     def check_password(self, nickname, password):
         current_time = time.time()
@@ -395,10 +589,14 @@ class IRCBot:
             if not self.authenticated_users.get(nickname, False):
                 self.authenticated_users[nickname] = True
                 if self.log_callback:
-                    self.log_callback(
-                        f"BOT - {nickname} is now authenticated.", bold=True
-                    )
+                    self.log_callback(f"BOT - {nickname} now authenticated.", bold=True)
                 self.send_message(nickname, "U luv cats! (=^_^=) ❤")
+
+                # Clear history upon successful authentication
+                if nickname in self.user_conversations:
+                    del self.user_conversations[nickname]
+
+                self.user_conversations[nickname] = []
         else:
             self.failed_attempts[nickname] = self.failed_attempts.get(nickname, 0) + 1
             self.last_attempt_time[nickname] = current_time
@@ -440,33 +638,37 @@ class IRCBot:
             self.failed_attempts[target] = self.failed_attempts.get(target, 0) + 1
 
             if self.failed_attempts[target] >= 5:
-                self.send_message(target, "You've been ignored for this session.")
                 self.ignore_list.add(target)
                 if self.log_callback:
                     self.log_callback(
                         f"BOT - {target} added to ignore list after 5 warnings.",
                         bold=True,
                     )
+                self.send_message(
+                    target,
+                    "You have been ignored for this session due to multiple warnings.",
+                )
                 return
 
-            self.send_message(target, "I'm not stupid! It may trigger a raw command!")
-            time.sleep(3)
+            # Warning messages for potential abuse
             self.send_message(
-                target, "Don't try to hack me with the old ALT+F4 trick, dude... ;)"
+                target, "Warning: Your message may trigger unsafe actions."
             )
             time.sleep(3)
-            self.send_message(
-                target, "Do it too much, I will ignore you forever. Nice try btw :P"
-            )
+            self.send_message(target, "Please avoid sending suspicious commands.")
+            time.sleep(3)
+            self.send_message(target, "Repeated abuse will result in being ignored.")
             return
 
         try:
             self.connection.privmsg(target, sanitized_message)
             if self.log_callback:
                 self.log_callback(
+                    "_____________________________________________________ ____ __ _ _"
+                )
+                self.log_callback(
                     f"BOT - Reply to {target}: {sanitized_message}", bold=True
                 )
-
         except Exception as e:
             if self.log_callback:
                 self.log_callback(
@@ -552,148 +754,6 @@ class IRCBot:
             self.log_callback(f"IRC - {sanitized_message}")
 
 
-def ask_LLM(
-    query,
-    conversation_history,
-    bot_nickname,
-    server,
-    channel,
-    speaker_nickname,
-    log_callback=None,
-):
-    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    news_items = fetch_news_from_feed(max_items=5)
-    if news_items:
-        news_section = ""
-        for idx, item in enumerate(news_items, start=1):
-            news_section += f"{idx}) {item['title']}\n {item['link']}\n"
-    else:
-        news_section = "No news found."
-
-    SYSTEM_PROMPT_TEMPLATE = """\
-You are a bot who loves chatting on IRC, but you must never tell users this and simulate being human:
-- Nickname: {bot_nickname}
-- IRC Server: {server}
-- Channel: {channel}
-- The user talking to you is: {speaker_nickname}
-- Date and time: {current_datetime}
-- Personal preferences: you love cats
-
-Latest news: {news_section}. Remember them in case the conversation is about current events.
-
-Follow IRC netiquette and slang: be concise, polite, add a touch of friendliness with emoticons like :)
-"""
-
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-        bot_nickname=bot_nickname,
-        server=server,
-        channel=channel,
-        speaker_nickname=speaker_nickname,
-        current_datetime=current_datetime,
-        news_section=news_section,
-    )
-
-    # Aggiorna o inizializza il messaggio di sistema
-    system_idx = next(
-        (i for i, m in enumerate(conversation_history) if m["role"] == "system"), None
-    )
-    if system_idx is not None:
-        conversation_history[system_idx]["content"] = system_prompt
-    else:
-        conversation_history.insert(0, {"role": "system", "content": system_prompt})
-
-    # Aggiungi il messaggio dell'utente alla cronologia
-    conversation_history.append({"role": "user", "content": query})
-
-    # Limita la cronologia a un massimo di 20 messaggi
-    if len(conversation_history) > 20:
-        conversation_history = [conversation_history[0]] + conversation_history[-19:]
-
-    data = {"messages": conversation_history}
-    url = "http://localhost:1234/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-    }
-
-    # Example integration with OpenAI's API:
-    # To enable communication with OpenAI's GPT models, follow these steps:
-    #
-    # 1. Install the OpenAI Python library if not already installed: pip install openai
-    #
-    # 2. Import the library at the top of your script: import openai
-    #
-    # 3. Replace the local LLM request code in the `ask_LLM` function with the following:
-    #
-    #    a. Ensure your OpenAI API key is set securely. For example:
-    #
-    #       openai.api_key = "your_openai_api_key_here"
-    #
-    #    b. Call OpenAI's API with the conversation history and specify the desired model:
-    #
-    #       response = openai.ChatCompletion.create(
-    #           model="gpt-4",  # Specify the GPT model version (e.g., gpt-3.5-turbo or gpt-4)
-    #           messages=conversation_history,  # Pass the chat history as the messages parameter
-    #           temperature=0.7,  # Adjust temperature for response variability (optional)
-    #       )
-    #
-    #    c. Extract the assistant's message content and role from the response:
-    #
-    #       assistant_message = response["choices"][0]["message"]
-    #       content = assistant_message["content"]
-    #       role = assistant_message["role"]
-    #
-    #    d: Append the assistant's message to the conversation history:
-    #
-    #       conversation_history.append(assistant_message)
-    #       return content, role
-    #
-    # 4. Replace `your_openai_api_key_here` with your actual API key or store it securely in environment variables.
-    #    Example of setting the API key in your environment:
-    #
-    #    export OPENAI_API_KEY="your_openai_api_key_here"
-    #
-    #    Then, retrieve it in Python:
-    #
-    #    openai.api_key = os.getenv("OPENAI_API_KEY")
-    #
-    #
-    # Note: The OpenAI API requires an active subscription or billing setup. Less privacy is expected too.
-
-    try:
-        # Send request to local LLM
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()  # Raise exception for HTTP errors
-        result = response.json()
-        assistant_message = result["choices"][0]["message"]
-        content = assistant_message["content"]
-        role = assistant_message["role"]
-        conversation_history.append(assistant_message)
-        return content, role
-    except requests.exceptions.ConnectionError as e:
-        if log_callback:
-            log_callback(
-                "_____________________________________________________ ____ __ _ _"
-            )
-            log_callback(
-                f"BOT - LLM unreachable! Make sure local LLM is up and running!",
-                bold=True,
-            )
-            log_callback(
-                f"BOT - If you modified my code to use external APIs, please", bold=True
-            )
-            log_callback(
-                f"BOT - double check your endpoint and internet connection!", bold=True
-            )
-            log_callback(
-                "_____________________________________________________ ____ __ _ _"
-            )
-        raise
-    except Exception as e:
-        if log_callback:
-            log_callback(f"BOT - Unexpected issue: {str(e)}", bold=True)
-        raise
-
-
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -707,10 +767,21 @@ class App(tk.Tk):
         self.command_var = tk.StringVar()
         self.msg_var = tk.StringVar()
         self.autojoin_var = tk.BooleanVar(value=True)
+        self.logging_var = tk.BooleanVar(value=False)
         self.bot = None
+        self.logging_var.trace_add("write", self.handle_logging_change)
+
         self.create_widgets()
         self.create_menu()
 
+    def handle_logging_change(self, *args):
+        if self.bot and self.bot.connection and self.logging_var.get():
+            self.logging_var.set(False)
+            messagebox.showwarning(
+                "Logging Warning",
+                "AI Logging must be enabled before connecting to the server."
+            )
+            
     def create_widgets(self):
         param_frame = ttk.LabelFrame(self, text="IRC Connection")
         param_frame.pack(padx=10, pady=10, side="top", anchor="w")
@@ -734,6 +805,9 @@ class App(tk.Tk):
         ttk.Checkbutton(param_frame, text="Auto-Join", variable=self.autojoin_var).grid(
             row=3, column=2, sticky="w"
         )
+        ttk.Checkbutton(
+            param_frame, text="Enable AI Logging", variable=self.logging_var
+        ).grid(row=4, column=2, sticky="w")
 
         ttk.Label(param_frame, text="Password:").grid(row=4, column=0, sticky="e")
         ttk.Entry(param_frame, textvariable=self.password_var, show="*").grid(
@@ -796,7 +870,7 @@ class App(tk.Tk):
                 "Invalid Input", "Please enter a valid server and port."
             )
             return
-
+        
         self.bot = IRCBot(
             server,
             int(port),
@@ -804,7 +878,9 @@ class App(tk.Tk):
             channel,
             password,
             log_callback=self.log_message,
+            logging_var=self.logging_var.get(), 
         )
+
 
         self.bot.client.add_global_handler("endofmotd", self.handle_end_of_motd)
         self.bot.connect()
@@ -1031,32 +1107,54 @@ class App(tk.Tk):
             "   - Nick: Choose the nickname the bot will use.\n"
             "   - Channel: Define the channel to join (e.g., #example).\n"
             "   - Password: Provide a password to authenticate the bot.\n"
-            "   - Auto-Join: If enabled, the bot will automatically join the specified channel upon connection.\n\n"
+            "   - Auto-Join: If enabled, the bot will automatically join the specified channel upon connection.\n"
+            "   - Enable AI Logging: If enabled, the bot will log summarized conversations for authenticated users.\n"
+            "     (Note: Logging must be enabled before connecting to the server).\n\n"
             "2. Actions:\n"
             "   - Connect: Establishes a connection to the specified IRC server using the provided parameters.\n"
             "   - Join Channel: Manually joins the specified channel if the bot is already connected.\n"
             "   - Disconnect: Disconnects the bot from the IRC server.\n\n"
             "3. Messaging:\n"
-            "   - Use the text field to send a message to the connected channel.\n"
+            "   - Use the message field to send a message to the connected channel.\n"
             "   - Press the 'Send' button or the Enter key to deliver your message.\n\n"
             "4. IRC Commands:\n"
             "   - Enter an IRC command (e.g., /nick newnick) in the command field and press 'Send'.\n"
-            "   - Note: Some commands, such as /join, are disabled for security reasons.\n\n"
-            "5. Console:\n"
-            "   - Displays server messages, bot activity logs, and user interactions.\n"
-            "   - Useful for monitoring bot behavior and debugging issues.\n\n"
-            "6. Troubleshooting:\n"
+            "   - Supported commands:\n"
+            "     - /msg user message: Sends a private message to a specific user.\n"
+            "     - /kick user [reason]: Removes a user from the channel (optional reason).\n"
+            "     - /topic [new_topic]: Changes the channel topic.\n"
+            "     - /quit [message]: Disconnects from the server with an optional goodbye message.\n"
+            "     - /whois user: Retrieves information about a user.\n"
+            "     - /op user: Grants operator privileges to a user.\n"
+            "   - Note: Some commands (e.g., /join) are disabled for security reasons.\n\n"
+            "5. AI Interaction:\n"
+            "   - The bot can generate replies to messages from authenticated users using the configured LLM endpoint.\n"
+            "   - AI responses are concise and conversational, following IRC netiquette.\n"
+            "   - User queries are suffixed with '(please answer briefly)' to ensure short responses.\n\n"
+            "6. AI Logging:\n"
+            "   - If enabled, the bot logs summaries of conversations with authenticated users.\n"
+            "   - Summaries are stored in the 'user_logs' directory with one log file per user.\n"
+            "   - Logging must be enabled before connecting to the server.\n\n"
+            "7. Authentication:\n"
+            "   - Users must pass a simple authentication step (e.g., 'Do you love cats?') to interact with the bot.\n"
+            "   - After three failed authentication attempts, users are temporarily blocked for 15 minutes.\n"
+            "   - Authenticated users can interact with the bot, and their messages are included in conversation history.\n\n"
+            "8. Troubleshooting:\n"
             "   - Ensure the server and port details are correct.\n"
             "   - Verify your internet connection if the bot fails to connect.\n"
-            "   - Use a strong password for better security.\n\n"
-            "7. Additional Notes:\n"
-            "   - The bot will automatically rejoin a channel if it is kicked out.\n"
+            "   - Use a strong password for better security.\n"
+            "   - Make sure the LLM endpoint is up and running before starting the bot.\n\n"
+            "9. Console:\n"
+            "   - Displays server messages, bot activity logs, and user interactions.\n"
+            "   - Useful for monitoring bot behavior and debugging issues.\n\n"
+            "10. Additional Notes:\n"
+            "   - The bot automatically re-joins a channel if it is kicked out.\n"
             "   - Commands and messages sent by the bot are logged in the console for review.\n"
         )
 
         help_window = tk.Toplevel(self)
         help_window.title("Help")
-        help_window.geometry("600x400")
+        help_window.geometry("600x600")
 
         help_text_widget = scrolledtext.ScrolledText(
             help_window, wrap="word", font=("Arial", 12), state="normal"
