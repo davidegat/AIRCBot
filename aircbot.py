@@ -26,11 +26,12 @@ FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
 LLM_ENDPOINT = "http://localhost:1234/v1/chat/completions"
 
 # Default options at startup (user can modify them via UI)
-nck = "Egidio"  # Nick
+nck = "Egidio"          # Nick
 srv = "ssl.ircnet.ovh"  # Server
-prt = "6667"  # Port
-chn = "#casale"  # Channel
+prt = "6667"            # Port
+chn = "#casale"         # Channel
 
+# Configuration ends here.
 
 def load_prompt(file_path):
     try:
@@ -248,7 +249,7 @@ class IRCBot:
     def connect(self):
         if self.log_callback:
             self.log_callback(
-                "LLM - Please always make sure local LLM is up and running."
+                "LLM - Please always make sure local LLM is up and running!"
             )
             self.log_callback(
                 "BOT - If you modified me, check your endpoint and connection."
@@ -297,7 +298,7 @@ class IRCBot:
                     ]
 
                 self.log_callback(
-                    f"LLM - Generating a reply for ACTION from {source}...",
+                    f"LLM - Generating reply for ACTION from {source}...",
                     bold=True,
                 )
 
