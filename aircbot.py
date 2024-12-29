@@ -9,29 +9,33 @@ import time
 import hashlib
 import irc.client
 import os
+import subprocess
+import json
 
-# File paths for prompts and help
-SYSTEM_PROMPT_FILE = "system_prompt.txt"
-SUMMARY_PROMPT_FILE = "summary_prompt.txt"
-HELP_TEXT_FILE = "help_text.txt"
+CONFIG_FILE = "config.json"
 
-# Log dir configuration
-LOG_DIR = "user_logs"
+def load_config(file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Config not found: {file_path}")
+    except json.JSONDecodeError:
+        raise ValueError(f"Error parsing config: {file_path}")
+
+config = load_config(CONFIG_FILE)
+
+SYSTEM_PROMPT_FILE = config["system_prompt_file"]
+SUMMARY_PROMPT_FILE = config["summary_prompt_file"]
+HELP_TEXT_FILE = config["help_text_file"]
+LOG_DIR = config["log_dir"]
+FEED_URL = config["feed_url"]
+LLM_ENDPOINT = config["llm_endpoint"]
+nck = config["default_nickname"]
+srv = config["default_server"]
+prt = config["default_port"]
+chn = config["default_channel"]
 os.makedirs(LOG_DIR, exist_ok=True)
-
-# Customize RSS feed
-FEED_URL = "https://www.ansa.it/english/news/english_nr_rss.xml"
-
-# Configurable LLM endpoint
-LLM_ENDPOINT = "http://localhost:1234/v1/chat/completions"
-
-# Default options at startup (user can modify them via UI)
-nck = "Egidio"          # Nick
-srv = "ssl.ircnet.ovh"  # Server
-prt = "6667"            # Port
-chn = "#casale"         # Channel
-
-# Configuration ends here.
 
 def load_prompt(file_path):
     try:
@@ -39,7 +43,6 @@ def load_prompt(file_path):
             return file.read()
     except FileNotFoundError:
         return ""
-
 
 
 SYSTEM_PROMPT_TEMPLATE = load_prompt(SYSTEM_PROMPT_FILE)
@@ -81,11 +84,14 @@ def ask_LLM(
 ):
     current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     news_items = fetch_news_from_feed(max_items=5)
-    news_section = "\n".join(
-        [f"{idx}) {item['title']}" for idx, item in enumerate(news_items, start=1)]
-    ) if news_items else "No news found."
+    news_section = (
+        "\n".join(
+            [f"{idx}) {item['title']}" for idx, item in enumerate(news_items, start=1)]
+        )
+        if news_items
+        else "No news found."
+    )
 
-    # Controlla quale template usare
     if summary_mode:
         try:
             system_prompt = SUMMARY_PROMPT_TEMPLATE.format()
@@ -108,12 +114,20 @@ def ask_LLM(
                 log_callback(f"Error in SYSTEM_PROMPT_TEMPLATE: Missing key {e}")
             raise
 
-    # Costruzione dei messaggi
     request_messages = [{"role": "system", "content": system_prompt}]
     if conversation_history:
+        conversation_history = conversation_history[-10:]
         request_messages.extend(conversation_history)
+
+        if len(conversation_history) % 6 == 0:
+            request_messages.append({"role": "system", "content": system_prompt})
+
     if query:
-        brief_query = f"{query.strip()} (please answer briefly)" if not summary_mode else query.strip()
+        brief_query = (
+            f"{query.strip()} (please answer briefly)"
+            if not summary_mode
+            else query.strip()
+        )
         request_messages.append({"role": "user", "content": brief_query})
 
     if len(request_messages) > 5:
@@ -122,7 +136,6 @@ def ask_LLM(
     data = {"messages": request_messages}
 
     headers = {"Content-Type": "application/json"}
-
 
     # Example integration with OpenAI's API:
     #
@@ -512,13 +525,10 @@ class IRCBot:
                     summary_history = [
                         {
                             "role": "system",
-                            "content": f"{SUMMARY_PROMPT_TEMPLATE}\n\nUSER name is {source}, and that's what he wrote:)",
+                            "content": f"{SUMMARY_PROMPT_TEMPLATE}\n\nRemember to swap 'USER' with real user name '{source}' while logging, and that's what {source} wrote:)",
                         },
                         {"role": "user", "content": "\n".join(messages_to_summarize)},
                     ]
-
-
-
 
                     try:
                         summary, _ = ask_LLM(
@@ -530,7 +540,7 @@ class IRCBot:
                             speaker_nickname=source,
                             log_callback=self.log_callback,
                             logging_enabled=self.logging_enabled,
-                            summary_mode=True,  # Attiva il sommario
+                            summary_mode=True,
                         )
                         append_to_user_log(self.logging_enabled, source, summary)
                         self.log_callback(f"BOT - AI-assisted log saved for {source}.")
@@ -768,6 +778,19 @@ class App(tk.Tk):
         self.create_widgets()
         self.create_menu()
 
+    def open_log_folder(self):
+        try:
+            if os.name == "nt":
+                subprocess.Popen(["explorer", LOG_DIR])
+            elif os.name == "posix":
+                subprocess.Popen(
+                    ["open" if "darwin" in os.sys.platform else "xdg-open", LOG_DIR]
+                )
+            else:
+                messagebox.showerror("Error", "Unsupported OS.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open log folder: {e}")
+
     def handle_logging_change(self, *args):
         if self.bot and self.bot.connection and self.logging_var.get():
             self.logging_var.set(False)
@@ -819,7 +842,9 @@ class App(tk.Tk):
         ttk.Button(action_frame, text="Disconnect", command=self.disconnect_bot).pack(
             side="left", padx=5
         )
-
+        ttk.Button(
+            action_frame, text="Open Log Folder", command=self.open_log_folder
+        ).pack(side="left", padx=5)
         msg_frame = ttk.LabelFrame(self, text="Send message to channel")
         msg_frame.pack(padx=10, pady=10, fill="x")
 
