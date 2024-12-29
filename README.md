@@ -75,6 +75,9 @@ Ensure the following libraries are installed and/or available:
 - `feedparser`
 - `threading`
 - `time`
+- `os`
+- `subprocess`
+- `json`
 - `datetime`
 - `hashlib`
 - `irc` (irc.client)
