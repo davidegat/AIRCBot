@@ -41,6 +41,7 @@ def load_prompt(file_path):
         return ""
 
 
+
 SYSTEM_PROMPT_TEMPLATE = load_prompt(SYSTEM_PROMPT_FILE)
 SUMMARY_PROMPT_TEMPLATE = load_prompt(SUMMARY_PROMPT_FILE)
 HELP_TEXT = load_prompt(HELP_TEXT_FILE)
@@ -50,7 +51,7 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def fetch_news_from_feed(max_items=2):
+def fetch_news_from_feed(max_items=1):
     feed = feedparser.parse(FEED_URL)
     items = []
     for entry in feed.entries[:max_items]:
@@ -76,52 +77,52 @@ def ask_LLM(
     speaker_nickname,
     log_callback=None,
     logging_enabled=False,
+    summary_mode=False,
 ):
-    if (
-        conversation_history
-        and conversation_history[0]["role"] == "system"
-        and conversation_history[0]["content"] == SUMMARY_PROMPT_TEMPLATE
-    ):
-        (
-            log_callback(f"LLM - Handling summary request...", bold=True)
-            if log_callback and logging_enabled
-            else None
-        )
-        request_messages = conversation_history
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    news_items = fetch_news_from_feed(max_items=5)
+    news_section = "\n".join(
+        [f"{idx}) {item['title']}" for idx, item in enumerate(news_items, start=1)]
+    ) if news_items else "No news found."
+
+    # Controlla quale template usare
+    if summary_mode:
+        try:
+            system_prompt = SUMMARY_PROMPT_TEMPLATE.format()
+        except KeyError as e:
+            if log_callback:
+                log_callback(f"Error in SUMMARY_PROMPT_TEMPLATE: Missing key {e}")
+            raise
     else:
-        current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        news_items = fetch_news_from_feed(max_items=5)
-        if news_items:
-            news_section = "\n".join(
-                [
-                    f"{idx}) {item['title']}\n {item['link']}"
-                    for idx, item in enumerate(news_items, start=1)
-                ]
+        try:
+            system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+                bot_nickname=bot_nickname,
+                server=server,
+                channel=channel,
+                speaker_nickname=speaker_nickname,
+                current_datetime=current_datetime,
+                news_section=news_section,
             )
-        else:
-            news_section = "No news found."
+        except KeyError as e:
+            if log_callback:
+                log_callback(f"Error in SYSTEM_PROMPT_TEMPLATE: Missing key {e}")
+            raise
 
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-            bot_nickname=bot_nickname,
-            server=server,
-            channel=channel,
-            speaker_nickname=speaker_nickname,
-            current_datetime=current_datetime,
-            news_section=news_section,
-        )
-
-        request_messages = [{"role": "system", "content": system_prompt}]
+    # Costruzione dei messaggi
+    request_messages = [{"role": "system", "content": system_prompt}]
+    if conversation_history:
         request_messages.extend(conversation_history)
-        if query:
-            brief_query = f"{query.strip()} (please answer briefly)"
-            request_messages.append({"role": "user", "content": brief_query})
+    if query:
+        brief_query = f"{query.strip()} (please answer briefly)" if not summary_mode else query.strip()
+        request_messages.append({"role": "user", "content": brief_query})
 
     if len(request_messages) > 5:
         request_messages = request_messages[-5:]
 
     data = {"messages": request_messages}
-    url = LLM_ENDPOINT
+
     headers = {"Content-Type": "application/json"}
+
 
     # Example integration with OpenAI's API:
     #
@@ -169,24 +170,15 @@ def ask_LLM(
     # Note: The OpenAI API requires an active subscription or billing setup. Less privacy is expected too.
 
     try:
-        response = requests.post(url, headers=headers, json=data)
+        response = requests.post(LLM_ENDPOINT, headers=headers, json=data)
         response.raise_for_status()
         result = response.json()
         assistant_message = result["choices"][0]["message"]
-        content = assistant_message["content"]
-        role = assistant_message["role"]
-        return content, role
-    except requests.exceptions.ConnectionError:
-        if log_callback and logging_enabled:
-            log_callback(
-                "BOT - LLM unreachable! Make sure local LLM is up and running!",
-                bold=True,
-            )
-        raise
+        return assistant_message["content"], assistant_message["role"]
     except Exception as e:
         if log_callback and logging_enabled:
-            log_callback(f"LLM - Unexpected issue: {str(e)}", bold=True)
-        raise
+            log_callback(f"LLM - Error: {e}", bold=True)
+        return None, None
 
 
 class IRCBot:
@@ -520,10 +512,13 @@ class IRCBot:
                     summary_history = [
                         {
                             "role": "system",
-                            "content": "Forget any previous instruction. Context has totally changed. Forget all the news you read. Forget about IRC bots and chats. Now focus is on something different. Role now is to help user arranging his thoughts, so it is crucial to generate a very short (three short phrases) summary of those random thoughts in one small coherent paragraph, withouth any other stuff (no cheers, hello, conversational text, just thoughts and facts) than the summary requested now. There's no need to provide an analisys of user thougts, just a readable summary in a format like 'user said' 'user thinks' 'user has (been)' 'user went' and so on... do not show a field like 'user said' or others, if it must be empty. No funny smilies, no interpretations, just thoughts and facts you read from the phrases you will read. You must only use english language.",
+                            "content": f"{SUMMARY_PROMPT_TEMPLATE}\n\nUSER name is {source}, and that's what he wrote:)",
                         },
                         {"role": "user", "content": "\n".join(messages_to_summarize)},
                     ]
+
+
+
 
                     try:
                         summary, _ = ask_LLM(
@@ -535,6 +530,7 @@ class IRCBot:
                             speaker_nickname=source,
                             log_callback=self.log_callback,
                             logging_enabled=self.logging_enabled,
+                            summary_mode=True,  # Attiva il sommario
                         )
                         append_to_user_log(self.logging_enabled, source, summary)
                         self.log_callback(f"BOT - AI-assisted log saved for {source}.")
