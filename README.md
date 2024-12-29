@@ -65,7 +65,7 @@ You can easily modify this software to use external APIs if needed (instructions
 - Tested on Python 3.9 or later.
 - Internet connection.
 - LMStudio (https://lmstudio.ai/) or equivalent local language model API.
-- Bot is configured to use LMStudio API at `http://localhost:1234/v1/chat/completions` endpoint (can be changed via variable on top of code, see code comments). 
+- Bot is configured to use LMStudio API at `http://localhost:1234/v1/chat/completions` endpoint (can be changed via `config.json` file). 
 - If you can't run a local LLM model, follow instructions in code comments to use your own external API endpoint (like OpenAI API - Please refer to OpenAI documentation for API access). Less privacy is to be expected in this use case. Beware external APIs can charge you money at each request!
 
 ### Python Libraries
@@ -119,6 +119,9 @@ In the graphical interface, fill in the following fields:
 - **Auto-Join:** Enable or disable automatic channel joining upon connection.
 - **Enable AI Logging:** Option to log AI-assisted summaries of user interactions.
 
+### Customizing Configuration
+Options like the system prompt, summary prompt, logging directory, LLM endpoint, and other defaults are now managed via the `config.json` file. Modify `config.json` to update these values without changing the code.
+
 ---
 
 ## Usage
@@ -145,7 +148,7 @@ Make sure your local LLM is up and running, then:
 
 6. **News Integration:**
    - The bot fetches the latest 3 news headlines and includes them in responses when/if relevant or if asked to.
-   - You can customize the RSS feed by changing the variable on top of the code (see code comments).
+   - You can customize the RSS feed in `config.json`.
 
 7. **AI-Assisted Summaries:**
    - If logging is enabled, the bot will summarize user interactions every three messages.
@@ -194,7 +197,7 @@ Some features are not supported to avoid complexity, or for security reasons:
 
 3. **AI Response Errors:**
    - Ensure LMStudio is running and accessible at `http://localhost:1234/v1/chat/completions`. A warning should be issued in the bot console if the local API is unreachable.
-      - NOTE: To use a different endpoint for local LLMs, just customize the LLM_ENDPOINT variable on top of the code (see code comments).
+      - NOTE: To use a different endpoint for local LLMs, update the value in `config.json`.
    - If you modified the code to support an external API, check if your endpoint and parameters are correct for your model.
    - If you modified the system prompt, try adapting it to get better answers.
 
@@ -202,7 +205,7 @@ Some features are not supported to avoid complexity, or for security reasons:
    - Reply quality and length depend upon which model you are using and relative settings, not on this program.
    - The included prompt is generally okay; you may want to change it to experiment with different results.
    - Also, try using different models and settings for different results.
-   - Keep values low on your LLM (or parameters in the code if using an external API): short response (100-150 tokens), short context (2000-3000), not too much temperature (0.55-0.65).
+   - Keep values low on your LLM (or parameters in `config.json` if using an external API): short response (100-150 tokens), short context (2000-3000), not too much temperature (0.55-0.65).
 
 ---
 
