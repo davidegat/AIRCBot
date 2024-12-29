@@ -1,0 +1,12 @@
+{
+    "system_prompt_file": "system_prompt.txt",
+    "summary_prompt_file": "summary_prompt.txt",
+    "help_text_file": "help_text.txt",
+    "log_dir": "user_logs",
+    "feed_url": "https://www.ansa.it/english/news/english_nr_rss.xml",
+    "llm_endpoint": "http://localhost:1234/v1/chat/completions",
+    "default_nickname": "Egidio",
+    "default_server": "ssl.ircnet.ovh",
+    "default_port": "6667",
+    "default_channel": "#casale"
+}
