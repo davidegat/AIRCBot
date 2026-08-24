@@ -154,7 +154,7 @@ def ask_LLM(
     #    b. Call OpenAI's API with the conversation history and specify the desired model:
     #
     #       response = openai.ChatCompletion.create(
-    #           model="gpt-4",  # Specify the GPT model version (e.g., gpt-3.5-turbo or gpt-4)
+    #           model="gpt-4",  # Specify the GPT model version (e.g. gpt-3.5-turbo or gpt-4)
     #           messages=conversation_history,  # Pass the chat history as the messages parameter
     #           temperature=0.7,  # Adjust temperature for response variability (optional)
     #       )
@@ -272,7 +272,6 @@ class IRCBot:
             )
             self.connection.add_global_handler("all_events", self.handle_server_message)
             self.connection.add_global_handler("ctcp", self.handle_ctcp_message)
-            self.start_keep_alive()
             threading.Thread(target=self.client.process_forever, daemon=True).start()
             if self.log_callback:
                 self.log_callback(f"BOT - {self.server} is up!", bold=True)
@@ -329,15 +328,17 @@ class IRCBot:
                 self.check_password(source, message)
 
     def join_channel(self):
-        if self.connection:
-            try:
-                self.connection.join(self.channel)
-
-            except Exception as e:
-                if self.log_callback:
-                    self.log_callback(
-                        f"\nBOT - Error joining {self.channel}: {e}\n", bold=True
-                    )
+        if not self.connection:
+            return False
+        try:
+            self.connection.join(self.channel)
+            return True
+        except Exception as e:
+            if self.log_callback:
+                self.log_callback(
+                    f"\nBOT - Error joining {self.channel}: {e}\n", bold=True
+                )
+            return False
 
     def start_keep_alive(self):
         if self.connection:
@@ -387,18 +388,11 @@ class IRCBot:
                     f"\nBOT - Kicked from {channel} by {kicker}. Rejoining...\n",
                     bold=True,
                 )
-            try:
-                time.sleep(2)
-                self.join_channel()
-                if self.log_callback:
-                    self.log_callback(
-                        f"BOT - Successfully rejoined {channel}.", bold=True
-                    )
-            except Exception as e:
-                if self.log_callback:
-                    self.log_callback(
-                        f"BOT - Error rejoining {channel}: {e}", bold=True
-                    )
+            time.sleep(2)
+            if self.join_channel() and self.log_callback:
+                self.log_callback(
+                    f"BOT - Rejoin request sent for {channel}.", bold=True
+                )
 
     def handle_nick_change(self, connection, event):
         old_nick = irc.client.NickMask(event.source).nick
@@ -902,13 +896,23 @@ class App(tk.Tk):
 
         self.bot.client.add_global_handler("endofmotd", self.handle_end_of_motd)
         self.bot.client.add_global_handler("nomotd", self.handle_end_of_motd)
+        self.bot.client.add_global_handler("join", self.handle_join)
         self.bot.connect()
         self.disable_connection_button()
 
     def handle_end_of_motd(self, connection, event):
+        self.bot.start_keep_alive()
         if self.autojoin_var.get():
             self.log_message("\nBOT - Joining channel...\n", bold=True)
             self.bot.join_channel()
+
+    def handle_join(self, connection, event):
+        if not self.bot or not event.source:
+            return
+        source = irc.client.NickMask(event.source).nick
+        if source == self.bot.nickname:
+            channel = event.target or self.bot.channel
+            self.log_message(f"BOT - Joined channel {channel}.", bold=True)
 
     def prompt_password(self):
         password_dialog = tk.Toplevel(self)
@@ -960,14 +964,9 @@ class App(tk.Tk):
                 "BOT - Not connected to any server. Please connect first.", bold=True
             )
             return
-        try:
-            self.bot.join_channel()
+        if self.bot.join_channel():
             self.log_message(
-                f"BOT - Joined channel {self.bot.channel}.", bold=True
-            )
-        except Exception as e:
-            self.log_message(
-                f"BOT - Error joining {self.bot.channel}: {e}", bold=True
+                f"BOT - Join request sent for {self.bot.channel}.", bold=True
             )
 
     def send_message(self, event=None):
@@ -1041,8 +1040,7 @@ class App(tk.Tk):
                     )
                 else:
                     self.log_message(
-                        "BOT - Invalid format for /kick. Use: /kick user [reason] ",
-                        bold=True,
+                        "BOT - Invalid format for /kick. Use: /kick user [reason] ", bold=True
                     )
 
             elif command == "topic":
