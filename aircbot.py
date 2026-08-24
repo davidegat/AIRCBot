@@ -901,6 +901,7 @@ class App(tk.Tk):
         )
 
         self.bot.client.add_global_handler("endofmotd", self.handle_end_of_motd)
+        self.bot.client.add_global_handler("nomotd", self.handle_end_of_motd)
         self.bot.connect()
         self.disable_connection_button()
 
@@ -954,18 +955,20 @@ class App(tk.Tk):
                 widget.state(["!disabled"])
 
     def join_channel(self):
-        if self.connection:
-            try:
-                self.connection.join(self.channel)
-                if self.log_callback:
-                    self.log_callback(
-                        f"BOT - Joined channel {self.channel}.", bold=True
-                    )
-            except Exception as e:
-                if self.log_callback:
-                    self.log_callback(
-                        f"BOT - Error joining {self.channel}: {e}", bold=True
-                    )
+        if not self.bot or not self.bot.connection:
+            self.log_message(
+                "BOT - Not connected to any server. Please connect first.", bold=True
+            )
+            return
+        try:
+            self.bot.join_channel()
+            self.log_message(
+                f"BOT - Joined channel {self.bot.channel}.", bold=True
+            )
+        except Exception as e:
+            self.log_message(
+                f"BOT - Error joining {self.bot.channel}: {e}", bold=True
+            )
 
     def send_message(self, event=None):
         if not self.bot or not self.bot.connection:
